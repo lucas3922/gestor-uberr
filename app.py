@@ -6,45 +6,46 @@ import plotly.express as px
 
 st.set_page_config(page_title="Driver Finance PRO", layout="wide")
 
-# -----------------------------
+# -----------------------
 # ESTILO VISUAL
-# -----------------------------
+# -----------------------
 
 st.markdown("""
 <style>
 
 .stApp {
-background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-color: white;
+background: linear-gradient(135deg,#141e30,#243b55);
 }
 
-h1, h2, h3 {
-color: white;
+h1,h2,h3,h4 {
+color:white;
 }
 
-div[data-testid="stMetric"]{
-background: rgba(255,255,255,0.08);
+div[data-testid="stMetric"] {
+background: rgba(0,0,0,0.55);
 padding:20px;
 border-radius:12px;
 }
 
-.block-container{
-padding-top:2rem;
+button[kind="secondary"] {
+height:70px;
+font-size:20px;
+border-radius:12px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------
+# -----------------------
 # TÍTULO
-# -----------------------------
+# -----------------------
 
 st.title("🚖 Driver Finance PRO")
-st.caption("Gestão financeira para motoristas de aplicativo")
+st.write("Gestão financeira para motoristas")
 
-# -----------------------------
+# -----------------------
 # BANCO DE DADOS
-# -----------------------------
+# -----------------------
 
 arquivo = "dados_motorista.csv"
 
@@ -56,23 +57,40 @@ else:
         "combustivel","bruto","liquido"
     ])
 
-# -----------------------------
-# MENU
-# -----------------------------
+# -----------------------
+# MENU COM BOTÕES GRANDES
+# -----------------------
 
-pagina = st.radio(
-"",
-["📊 Dashboard","🚖 Lançamento","📈 Relatórios","🏠 Contas"],
-horizontal=True
-)
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "dashboard"
 
-# -----------------------------
+col1,col2 = st.columns(2)
+
+if col1.button("📊 DASHBOARD", use_container_width=True):
+    st.session_state.pagina = "dashboard"
+
+if col2.button("🚖 LANÇAR DIA", use_container_width=True):
+    st.session_state.pagina = "lancar"
+
+col3,col4 = st.columns(2)
+
+if col3.button("📈 RELATÓRIOS", use_container_width=True):
+    st.session_state.pagina = "relatorios"
+
+if col4.button("🏠 CONTAS DA CASA", use_container_width=True):
+    st.session_state.pagina = "contas"
+
+st.divider()
+
+pagina = st.session_state.pagina
+
+# -----------------------
 # DASHBOARD
-# -----------------------------
+# -----------------------
 
-if pagina == "📊 Dashboard":
+if pagina == "dashboard":
 
-    st.subheader("Visão Geral")
+    st.header("📊 Visão Geral")
 
     if len(df) > 0:
 
@@ -85,9 +103,9 @@ if pagina == "📊 Dashboard":
 
         c1,c2,c3,c4 = st.columns(4)
 
-        c1.metric("💰 Ganho Bruto", round(bruto_total,2))
-        c2.metric("💵 Ganho Líquido", round(liquido_total,2))
-        c3.metric("🚗 KM Rodados", round(km_total,2))
+        c1.metric("💰 Bruto", round(bruto_total,2))
+        c2.metric("💵 Líquido", round(liquido_total,2))
+        c3.metric("🚗 KM", round(km_total,2))
         c4.metric("⏱ Horas", round(horas_total,2))
 
         st.divider()
@@ -104,25 +122,25 @@ if pagina == "📊 Dashboard":
         st.plotly_chart(graf, use_container_width=True)
 
     else:
-        st.info("Ainda não existem registros.")
+        st.info("Nenhum lançamento ainda.")
 
-# -----------------------------
+# -----------------------
 # LANÇAMENTO
-# -----------------------------
+# -----------------------
 
-if pagina == "🚖 Lançamento":
+if pagina == "lancar":
 
-    st.subheader("Lançar ganhos do dia")
+    st.header("🚖 Lançamento do dia")
 
     if "inicio_turno" not in st.session_state:
         st.session_state.inicio_turno = None
 
-    col1,col2 = st.columns(2)
+    c1,c2 = st.columns(2)
 
-    if col1.button("▶️ Iniciar turno"):
+    if c1.button("▶️ Iniciar turno"):
         st.session_state.inicio_turno = datetime.datetime.now()
 
-    if col2.button("⛔ Encerrar turno"):
+    if c2.button("⛔ Encerrar turno"):
         if st.session_state.inicio_turno:
             fim = datetime.datetime.now()
             horas = (fim - st.session_state.inicio_turno).total_seconds()/3600
@@ -185,13 +203,13 @@ if pagina == "🚖 Lançamento":
 
         st.success("Dia salvo!")
 
-# -----------------------------
+# -----------------------
 # RELATÓRIOS
-# -----------------------------
+# -----------------------
 
-if pagina == "📈 Relatórios":
+if pagina == "relatorios":
 
-    st.subheader("Relatórios mensais")
+    st.header("📈 Relatórios")
 
     if len(df) > 0:
 
@@ -203,13 +221,13 @@ if pagina == "📈 Relatórios":
 
         st.dataframe(mensal)
 
-# -----------------------------
+# -----------------------
 # CONTAS
-# -----------------------------
+# -----------------------
 
-if pagina == "🏠 Contas":
+if pagina == "contas":
 
-    st.subheader("Contas da casa")
+    st.header("🏠 Contas da casa")
 
     luz = st.number_input("Luz",0.0)
     agua = st.number_input("Água",0.0)
@@ -224,11 +242,3 @@ if pagina == "🏠 Contas":
 
     st.metric("Despesa mensal", round(despesa,2))
     st.metric("Meta diária", round(meta,2))
-
-    progresso = 0
-
-    if len(df) > 0:
-        ganho_mes = df["liquido"].sum()
-        progresso = ganho_mes/despesa if despesa>0 else 0
-
-    st.progress(min(progresso,1.0))
