@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
-import plotly.express as px
 
 st.set_page_config(page_title="Driver Finance PRO", layout="wide")
 
@@ -14,17 +13,18 @@ st.markdown("""
 <style>
 
 .stApp {
-background: linear-gradient(135deg,#141e30,#243b55);
+background-color: #f5f1e8;
 }
 
 h1,h2,h3,h4 {
-color:white;
+color:#2b2b2b;
 }
 
 div[data-testid="stMetric"] {
-background: rgba(0,0,0,0.55);
+background: white;
 padding:20px;
 border-radius:12px;
+box-shadow:0px 2px 6px rgba(0,0,0,0.1);
 }
 
 button[kind="secondary"] {
@@ -41,7 +41,7 @@ border-radius:12px;
 # -----------------------
 
 st.title("🚖 Driver Finance PRO")
-st.write("Gestão financeira para motoristas")
+st.write("Gestão financeira para motoristas de aplicativo")
 
 # -----------------------
 # BANCO DE DADOS
@@ -58,7 +58,7 @@ else:
     ])
 
 # -----------------------
-# MENU COM BOTÕES GRANDES
+# MENU
 # -----------------------
 
 if "pagina" not in st.session_state:
@@ -103,26 +103,23 @@ if pagina == "dashboard":
 
         c1,c2,c3,c4 = st.columns(4)
 
-        c1.metric("💰 Bruto", round(bruto_total,2))
-        c2.metric("💵 Líquido", round(liquido_total,2))
-        c3.metric("🚗 KM", round(km_total,2))
-        c4.metric("⏱ Horas", round(horas_total,2))
+        c1.metric("💰 Ganho Bruto", round(bruto_total,2))
+        c2.metric("💵 Ganho Líquido", round(liquido_total,2))
+        c3.metric("🚗 KM Rodados", round(km_total,2))
+        c4.metric("⏱ Horas Trabalhadas", round(horas_total,2))
 
         st.divider()
 
-        graf = px.line(
-            df,
-            x="data",
-            y="liquido",
-            markers=True,
-            template="plotly_dark",
-            title="Lucro diário"
-        )
+        media_km = liquido_total/km_total if km_total>0 else 0
+        media_hora = liquido_total/horas_total if horas_total>0 else 0
 
-        st.plotly_chart(graf, use_container_width=True)
+        c5,c6 = st.columns(2)
+
+        c5.metric("💰 Média por KM", round(media_km,2))
+        c6.metric("⏱ Média por Hora", round(media_hora,2))
 
     else:
-        st.info("Nenhum lançamento ainda.")
+        st.info("Nenhum lançamento registrado ainda.")
 
 # -----------------------
 # LANÇAMENTO
@@ -167,7 +164,6 @@ if pagina == "lancar":
     km_bruto = bruto/km if km>0 else 0
     km_liquido = liquido/km if km>0 else 0
 
-    hora_bruto = bruto/horas if horas>0 else 0
     hora_liquido = liquido/horas if horas>0 else 0
 
     st.divider()
@@ -221,6 +217,9 @@ if pagina == "relatorios":
 
         st.dataframe(mensal)
 
+    else:
+        st.info("Sem dados para relatório.")
+
 # -----------------------
 # CONTAS
 # -----------------------
@@ -240,5 +239,5 @@ if pagina == "contas":
 
     meta = despesa/30 if despesa>0 else 0
 
-    st.metric("Despesa mensal", round(despesa,2))
-    st.metric("Meta diária", round(meta,2))
+    st.metric("💸 Despesa mensal", round(despesa,2))
+    st.metric("🎯 Meta diária", round(meta,2))
