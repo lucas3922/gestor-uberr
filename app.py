@@ -6,7 +6,7 @@ import os
 st.set_page_config(page_title="Driver Finance PRO", layout="wide")
 
 # -----------------------
-# ESTILO VISUAL
+# ESTILO
 # -----------------------
 
 st.markdown("""
@@ -21,27 +21,23 @@ color:#2b2b2b;
 }
 
 div[data-testid="stMetric"] {
-background: white;
-padding:20px;
-border-radius:12px;
+background:white;
+padding:15px;
+border-radius:10px;
 box-shadow:0px 2px 6px rgba(0,0,0,0.1);
+text-align:center;
 }
 
 button[kind="secondary"] {
-height:70px;
-font-size:20px;
-border-radius:12px;
+height:65px;
+font-size:18px;
+border-radius:10px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------
-# TÍTULO
-# -----------------------
-
 st.title("🚖 Driver Finance PRO")
-st.write("Gestão financeira para motoristas de aplicativo")
 
 # -----------------------
 # BANCO DE DADOS
@@ -64,20 +60,20 @@ else:
 if "pagina" not in st.session_state:
     st.session_state.pagina = "dashboard"
 
-col1,col2 = st.columns(2)
+c1,c2 = st.columns(2)
 
-if col1.button("📊 DASHBOARD", use_container_width=True):
+if c1.button("📊 Dashboard", use_container_width=True):
     st.session_state.pagina = "dashboard"
 
-if col2.button("🚖 LANÇAR DIA", use_container_width=True):
+if c2.button("🚖 Lançar Dia", use_container_width=True):
     st.session_state.pagina = "lancar"
 
-col3,col4 = st.columns(2)
+c3,c4 = st.columns(2)
 
-if col3.button("📈 RELATÓRIOS", use_container_width=True):
+if c3.button("📈 Relatórios", use_container_width=True):
     st.session_state.pagina = "relatorios"
 
-if col4.button("🏠 CONTAS DA CASA", use_container_width=True):
+if c4.button("🏠 Contas", use_container_width=True):
     st.session_state.pagina = "contas"
 
 st.divider()
@@ -90,36 +86,45 @@ pagina = st.session_state.pagina
 
 if pagina == "dashboard":
 
-    st.header("📊 Visão Geral")
+    st.header("📊 Painel Financeiro")
 
     if len(df) > 0:
-
-        df["data"] = pd.to_datetime(df["data"])
 
         bruto_total = df["bruto"].sum()
         liquido_total = df["liquido"].sum()
         km_total = df["km"].sum()
         horas_total = df["horas"].sum()
 
-        c1,c2,c3,c4 = st.columns(4)
-
-        c1.metric("💰 Ganho Bruto", round(bruto_total,2))
-        c2.metric("💵 Ganho Líquido", round(liquido_total,2))
-        c3.metric("🚗 KM Rodados", round(km_total,2))
-        c4.metric("⏱ Horas Trabalhadas", round(horas_total,2))
-
-        st.divider()
-
         media_km = liquido_total/km_total if km_total>0 else 0
         media_hora = liquido_total/horas_total if horas_total>0 else 0
 
-        c5,c6 = st.columns(2)
-
-        c5.metric("💰 Média por KM", round(media_km,2))
-        c6.metric("⏱ Média por Hora", round(media_hora,2))
-
     else:
-        st.info("Nenhum lançamento registrado ainda.")
+
+        bruto_total = 0
+        liquido_total = 0
+        km_total = 0
+        horas_total = 0
+        media_km = 0
+        media_hora = 0
+
+    # valores da casa
+    despesa = st.session_state.get("despesa_mensal",0)
+
+    meta_diaria = despesa/30 if despesa>0 else 0
+
+    # GRID DE CARDS
+
+    c1,c2,c3 = st.columns(3)
+
+    c1.metric("🎯 Meta diária", round(meta_diaria,2))
+    c2.metric("💳 Dívida do mês", round(despesa,2))
+    c3.metric("💵 Lucro total", round(liquido_total,2))
+
+    c4,c5,c6 = st.columns(3)
+
+    c4.metric("🚗 R$/KM", round(media_km,2))
+    c5.metric("⏱ R$/Hora", round(media_hora,2))
+    c6.metric("🚗 KM rodados", round(km_total,2))
 
 # -----------------------
 # LANÇAMENTO
@@ -166,7 +171,6 @@ if pagina == "lancar":
 
     hora_liquido = liquido/horas if horas>0 else 0
 
-    st.divider()
     st.subheader("Resultado")
 
     c1,c2,c3 = st.columns(3)
@@ -217,9 +221,6 @@ if pagina == "relatorios":
 
         st.dataframe(mensal)
 
-    else:
-        st.info("Sem dados para relatório.")
-
 # -----------------------
 # CONTAS
 # -----------------------
@@ -236,6 +237,8 @@ if pagina == "contas":
     outros = st.number_input("Outros",0.0)
 
     despesa = luz+agua+internet+aluguel+mercado+outros
+
+    st.session_state.despesa_mensal = despesa
 
     meta = despesa/30 if despesa>0 else 0
 
