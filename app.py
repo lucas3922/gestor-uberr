@@ -4,25 +4,47 @@ import datetime
 import os
 import plotly.express as px
 
-st.set_page_config(page_title="Gestor Uber PRO", layout="wide")
+st.set_page_config(page_title="Driver Finance PRO", layout="wide")
 
-# CSS para interface escura
+# -----------------------------
+# ESTILO VISUAL
+# -----------------------------
+
 st.markdown("""
 <style>
 
 .stApp {
-    background-color: #0e1117;
-    color: white;
+background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color: white;
 }
 
-[data-testid="stMetricValue"] {
-    font-size: 28px;
+h1, h2, h3 {
+color: white;
+}
+
+div[data-testid="stMetric"]{
+background: rgba(255,255,255,0.08);
+padding:20px;
+border-radius:12px;
+}
+
+.block-container{
+padding-top:2rem;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🚖 Gestor Uber PRO")
+# -----------------------------
+# TÍTULO
+# -----------------------------
+
+st.title("🚖 Driver Finance PRO")
+st.caption("Gestão financeira para motoristas de aplicativo")
+
+# -----------------------------
+# BANCO DE DADOS
+# -----------------------------
 
 arquivo = "dados_motorista.csv"
 
@@ -34,21 +56,23 @@ else:
         "combustivel","bruto","liquido"
     ])
 
-# ABAS
-dashboard, lancamento, relatorios, contas = st.tabs([
-    "📊 Dashboard",
-    "🚖 Lançar Dia",
-    "📈 Relatórios",
-    "🏠 Contas da Casa"
-])
+# -----------------------------
+# MENU
+# -----------------------------
 
-# -------------------------
+pagina = st.radio(
+"",
+["📊 Dashboard","🚖 Lançamento","📈 Relatórios","🏠 Contas"],
+horizontal=True
+)
+
+# -----------------------------
 # DASHBOARD
-# -------------------------
+# -----------------------------
 
-with dashboard:
+if pagina == "📊 Dashboard":
 
-    st.header("📊 Painel Geral")
+    st.subheader("Visão Geral")
 
     if len(df) > 0:
 
@@ -61,10 +85,12 @@ with dashboard:
 
         c1,c2,c3,c4 = st.columns(4)
 
-        c1.metric("💰 Bruto total", round(bruto_total,2))
-        c2.metric("💵 Líquido total", round(liquido_total,2))
-        c3.metric("🚗 KM rodados", round(km_total,2))
+        c1.metric("💰 Ganho Bruto", round(bruto_total,2))
+        c2.metric("💵 Ganho Líquido", round(liquido_total,2))
+        c3.metric("🚗 KM Rodados", round(km_total,2))
         c4.metric("⏱ Horas", round(horas_total,2))
+
+        st.divider()
 
         graf = px.line(
             df,
@@ -78,25 +104,25 @@ with dashboard:
         st.plotly_chart(graf, use_container_width=True)
 
     else:
-        st.write("Nenhum dado ainda.")
+        st.info("Ainda não existem registros.")
 
-# -------------------------
+# -----------------------------
 # LANÇAMENTO
-# -------------------------
+# -----------------------------
 
-with lancamento:
+if pagina == "🚖 Lançamento":
 
-    st.header("🚖 Lançamento do Dia")
+    st.subheader("Lançar ganhos do dia")
 
     if "inicio_turno" not in st.session_state:
         st.session_state.inicio_turno = None
 
-    c1,c2 = st.columns(2)
+    col1,col2 = st.columns(2)
 
-    if c1.button("▶️ Iniciar turno"):
+    if col1.button("▶️ Iniciar turno"):
         st.session_state.inicio_turno = datetime.datetime.now()
 
-    if c2.button("⛔ Encerrar turno"):
+    if col2.button("⛔ Encerrar turno"):
         if st.session_state.inicio_turno:
             fim = datetime.datetime.now()
             horas = (fim - st.session_state.inicio_turno).total_seconds()/3600
@@ -126,6 +152,7 @@ with lancamento:
     hora_bruto = bruto/horas if horas>0 else 0
     hora_liquido = liquido/horas if horas>0 else 0
 
+    st.divider()
     st.subheader("Resultado")
 
     c1,c2,c3 = st.columns(3)
@@ -136,11 +163,11 @@ with lancamento:
 
     c4,c5,c6 = st.columns(3)
 
-    c4.metric("🚗 KM bruto", round(km_bruto,2))
-    c5.metric("🚗 KM líquido", round(km_liquido,2))
-    c6.metric("⏱ Hora líquida", round(hora_liquido,2))
+    c4.metric("🚗 R$/KM Bruto", round(km_bruto,2))
+    c5.metric("🚗 R$/KM Líquido", round(km_liquido,2))
+    c6.metric("⏱ R$/Hora", round(hora_liquido,2))
 
-    if st.button("💾 Salvar Dia"):
+    if st.button("💾 Salvar dia"):
 
         novo = pd.DataFrame({
             "data":[datetime.date.today()],
@@ -158,13 +185,13 @@ with lancamento:
 
         st.success("Dia salvo!")
 
-# -------------------------
+# -----------------------------
 # RELATÓRIOS
-# -------------------------
+# -----------------------------
 
-with relatorios:
+if pagina == "📈 Relatórios":
 
-    st.header("📈 Relatórios")
+    st.subheader("Relatórios mensais")
 
     if len(df) > 0:
 
@@ -176,13 +203,13 @@ with relatorios:
 
         st.dataframe(mensal)
 
-# -------------------------
+# -----------------------------
 # CONTAS
-# -------------------------
+# -----------------------------
 
-with contas:
+if pagina == "🏠 Contas":
 
-    st.header("🏠 Contas da Casa")
+    st.subheader("Contas da casa")
 
     luz = st.number_input("Luz",0.0)
     agua = st.number_input("Água",0.0)
@@ -197,3 +224,11 @@ with contas:
 
     st.metric("Despesa mensal", round(despesa,2))
     st.metric("Meta diária", round(meta,2))
+
+    progresso = 0
+
+    if len(df) > 0:
+        ganho_mes = df["liquido"].sum()
+        progresso = ganho_mes/despesa if despesa>0 else 0
+
+    st.progress(min(progresso,1.0))
