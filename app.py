@@ -4,13 +4,28 @@ import datetime
 import os
 import plotly.express as px
 
-st.set_page_config(page_title="Gestor Uber PRO", layout="centered")
+st.set_page_config(page_title="Gestor Uber PRO", layout="wide")
 
-st.title("🚖 Gestor Financeiro do Motorista")
+# CSS para interface escura
+st.markdown("""
+<style>
+
+.stApp {
+    background-color: #0e1117;
+    color: white;
+}
+
+[data-testid="stMetricValue"] {
+    font-size: 28px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+st.title("🚖 Gestor Uber PRO")
 
 arquivo = "dados_motorista.csv"
 
-# carregar histórico
 if os.path.exists(arquivo):
     df = pd.read_csv(arquivo)
 else:
@@ -19,73 +34,83 @@ else:
         "combustivel","bruto","liquido"
     ])
 
-# MENU
-pagina = st.sidebar.selectbox(
-    "Menu",
-    ["Dashboard","Lançar Dia","Relatórios","Contas da Casa"]
-)
+# ABAS
+dashboard, lancamento, relatorios, contas = st.tabs([
+    "📊 Dashboard",
+    "🚖 Lançar Dia",
+    "📈 Relatórios",
+    "🏠 Contas da Casa"
+])
 
 # -------------------------
-# CONTAS DA CASA
+# DASHBOARD
 # -------------------------
 
-if pagina == "Contas da Casa":
+with dashboard:
 
-    st.header("🏠 Contas da Casa")
+    st.header("📊 Painel Geral")
 
-    luz = st.number_input("Conta de Luz",0.0)
-    agua = st.number_input("Água",0.0)
-    internet = st.number_input("Internet",0.0)
-    aluguel = st.number_input("Aluguel",0.0)
-    mercado = st.number_input("Mercado",0.0)
-    outros = st.number_input("Outros",0.0)
+    if len(df) > 0:
 
-    despesa_mensal = luz+agua+internet+aluguel+mercado+outros
-    meta_diaria = despesa_mensal/30 if despesa_mensal>0 else 0
+        df["data"] = pd.to_datetime(df["data"])
 
-    st.metric("💸 Despesa mensal",round(despesa_mensal,2))
-    st.metric("🎯 Meta diária",round(meta_diaria,2))
+        bruto_total = df["bruto"].sum()
+        liquido_total = df["liquido"].sum()
+        km_total = df["km"].sum()
+        horas_total = df["horas"].sum()
+
+        c1,c2,c3,c4 = st.columns(4)
+
+        c1.metric("💰 Bruto total", round(bruto_total,2))
+        c2.metric("💵 Líquido total", round(liquido_total,2))
+        c3.metric("🚗 KM rodados", round(km_total,2))
+        c4.metric("⏱ Horas", round(horas_total,2))
+
+        graf = px.line(
+            df,
+            x="data",
+            y="liquido",
+            markers=True,
+            template="plotly_dark",
+            title="Lucro diário"
+        )
+
+        st.plotly_chart(graf, use_container_width=True)
+
+    else:
+        st.write("Nenhum dado ainda.")
 
 # -------------------------
 # LANÇAMENTO
 # -------------------------
 
-if pagina == "Lançar Dia":
+with lancamento:
 
     st.header("🚖 Lançamento do Dia")
 
-    # iniciar turno
     if "inicio_turno" not in st.session_state:
         st.session_state.inicio_turno = None
 
-    if st.button("▶️ Iniciar turno"):
+    c1,c2 = st.columns(2)
+
+    if c1.button("▶️ Iniciar turno"):
         st.session_state.inicio_turno = datetime.datetime.now()
 
-    if st.button("⛔ Encerrar turno"):
+    if c2.button("⛔ Encerrar turno"):
         if st.session_state.inicio_turno:
             fim = datetime.datetime.now()
-            horas_calc = (fim - st.session_state.inicio_turno).total_seconds()/3600
-            st.session_state.horas_trabalhadas = horas_calc
+            horas = (fim - st.session_state.inicio_turno).total_seconds()/3600
+            st.session_state.horas_trabalhadas = horas
 
-    # horas manual
-    horas_manual = st.number_input("Horas trabalhadas (manual)",0.0)
+    horas_manual = st.number_input("Horas trabalhadas",0.0)
 
-    horas_turno = st.session_state.get("horas_trabalhadas",0)
+    horas = st.session_state.get("horas_trabalhadas", horas_manual)
 
-    if horas_turno > 0:
-        horas = horas_turno
-        st.write("Horas calculadas pelo turno:",round(horas,2))
-    else:
-        horas = horas_manual
-
-    # ganhos
     uber = st.number_input("Ganhos Uber",0.0)
     noventa_nove = st.number_input("Ganhos 99",0.0)
 
-    # km
     km = st.number_input("KM rodados",0.0)
 
-    # combustível
     consumo = st.number_input("Consumo do carro (km/L)",0.0)
     gasolina = st.number_input("Preço gasolina",0.0)
 
@@ -101,14 +126,19 @@ if pagina == "Lançar Dia":
     hora_bruto = bruto/horas if horas>0 else 0
     hora_liquido = liquido/horas if horas>0 else 0
 
-    st.subheader("📊 Resultado")
+    st.subheader("Resultado")
 
-    st.metric("💰 Ganho bruto",round(bruto,2))
-    st.metric("💵 Ganho líquido",round(liquido,2))
-    st.metric("🚗 KM bruto",round(km_bruto,2))
-    st.metric("🚗 KM líquido",round(km_liquido,2))
-    st.metric("⏱ Hora bruto",round(hora_bruto,2))
-    st.metric("⏱ Hora líquido",round(hora_liquido,2))
+    c1,c2,c3 = st.columns(3)
+
+    c1.metric("💰 Bruto", round(bruto,2))
+    c2.metric("💵 Líquido", round(liquido,2))
+    c3.metric("⛽ Combustível", round(combustivel,2))
+
+    c4,c5,c6 = st.columns(3)
+
+    c4.metric("🚗 KM bruto", round(km_bruto,2))
+    c5.metric("🚗 KM líquido", round(km_liquido,2))
+    c6.metric("⏱ Hora líquida", round(hora_liquido,2))
 
     if st.button("💾 Salvar Dia"):
 
@@ -126,47 +156,17 @@ if pagina == "Lançar Dia":
         df = pd.concat([df,novo],ignore_index=True)
         df.to_csv(arquivo,index=False)
 
-        st.success("Dia salvo com sucesso!")
-
-# -------------------------
-# DASHBOARD
-# -------------------------
-
-if pagina == "Dashboard":
-
-    st.header("📊 Dashboard")
-
-    if len(df) == 0:
-        st.write("Nenhum dado ainda.")
-    else:
-
-        df["data"] = pd.to_datetime(df["data"])
-
-        bruto_total = df["bruto"].sum()
-        liquido_total = df["liquido"].sum()
-        km_total = df["km"].sum()
-        horas_total = df["horas"].sum()
-
-        st.metric("💰 Total bruto",round(bruto_total,2))
-        st.metric("💵 Total líquido",round(liquido_total,2))
-        st.metric("🚗 KM rodados",round(km_total,2))
-        st.metric("⏱ Horas trabalhadas",round(horas_total,2))
-
-        graf = px.line(df,x="data",y="liquido",markers=True,title="Lucro diário")
-
-        st.plotly_chart(graf,use_container_width=True)
+        st.success("Dia salvo!")
 
 # -------------------------
 # RELATÓRIOS
 # -------------------------
 
-if pagina == "Relatórios":
+with relatorios:
 
-    st.header("📅 Relatórios")
+    st.header("📈 Relatórios")
 
-    if len(df) == 0:
-        st.write("Nenhum dado ainda.")
-    else:
+    if len(df) > 0:
 
         df["data"] = pd.to_datetime(df["data"])
 
@@ -174,13 +174,26 @@ if pagina == "Relatórios":
 
         mensal = df.groupby("mes").sum(numeric_only=True)
 
-        st.subheader("Relatório mensal")
-
         st.dataframe(mensal)
 
-        km_total = df["km"].sum()
-        bruto_total = df["bruto"].sum()
+# -------------------------
+# CONTAS
+# -------------------------
 
-        media_km = bruto_total/km_total if km_total>0 else 0
+with contas:
 
-        st.metric("🚗 Média ganho por KM",round(media_km,2))
+    st.header("🏠 Contas da Casa")
+
+    luz = st.number_input("Luz",0.0)
+    agua = st.number_input("Água",0.0)
+    internet = st.number_input("Internet",0.0)
+    aluguel = st.number_input("Aluguel",0.0)
+    mercado = st.number_input("Mercado",0.0)
+    outros = st.number_input("Outros",0.0)
+
+    despesa = luz+agua+internet+aluguel+mercado+outros
+
+    meta = despesa/30 if despesa>0 else 0
+
+    st.metric("Despesa mensal", round(despesa,2))
+    st.metric("Meta diária", round(meta,2))
