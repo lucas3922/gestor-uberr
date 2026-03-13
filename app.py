@@ -74,9 +74,9 @@ if 'contas' not in st.session_state:
     }
 
 # Cálculo de dias restantes no mês
-hoje_dt = date.today()
-ultimo_dia = calendar.monthrange(hoje_dt.year, hoje_dt.month)[1]
-dias_restantes = (ultimo_dia - hoje_dt.day) + 1
+hoje_ref = date.today()
+ultimo_dia = calendar.monthrange(hoje_ref.year, hoje_ref.month)[1]
+dias_restantes = (ultimo_dia - hoje_ref.day) + 1
 
 total_casa = sum(v for v in st.session_state.contas.values() if v is not None)
 
@@ -124,6 +124,8 @@ with tab_res:
 
 with tab_lan:
     st.subheader("Lançar Dia")
+    # NOVO CAMPO DE DATA
+    data_lan = st.date_input("Data do Trabalho", value=date.today())
     b_in = st.number_input("Ganho Bruto", value=None, placeholder=" ")
     k_in = st.number_input("KM Total", value=None, placeholder=" ")
     h_in = st.number_input("Horas", value=None, placeholder=" ")
@@ -134,25 +136,33 @@ with tab_lan:
             l_calc = b_in - (c_in or 0.0)
             k_calc = k_in or 1.0
             h_calc = h_in or 1.0
-            novo = {"Data": datetime.now().strftime("%d/%m/%Y"), "Bruto": b_in, "Líquido": l_calc, "KM": k_calc, "Horas": h_calc, "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc}
+            novo = {
+                "Data": data_lan.strftime("%d/%m/%Y"), 
+                "Bruto": b_in, 
+                "Líquido": l_calc, 
+                "KM": k_calc, 
+                "Horas": h_calc, 
+                "KM_Liq": l_calc/k_calc, 
+                "Hora_Liq": l_calc/h_calc
+            }
             st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo])], ignore_index=True)
-            st.success("Salvo!")
+            st.success(f"Dia {data_lan.strftime('%d/%m')} salvo!")
             st.rerun()
 
 with tab_hist:
     if not st.session_state.historico.empty:
         df_h = st.session_state.historico.copy()
         df_h['Data_dt'] = pd.to_datetime(df_h['Data'], format='%d/%m/%Y')
-        hoje = datetime.now()
+        hoje_agora = datetime.now()
 
         periodo = st.radio("Período:", ["Semana", "Mês", "Ano"], horizontal=True)
 
         if periodo == "Semana":
-            mask = df_h['Data_dt'] > (hoje - timedelta(days=7))
+            mask = df_h['Data_dt'] > (hoje_agora - timedelta(days=7))
         elif periodo == "Mês":
-            mask = df_h['Data_dt'].dt.month == hoje.month
+            mask = df_h['Data_dt'].dt.month == hoje_agora.month
         else:
-            mask = df_h['Data_dt'].dt.year == hoje.year
+            mask = df_h['Data_dt'].dt.year == hoje_agora.year
 
         df_p = df_h[mask]
         
@@ -160,6 +170,8 @@ with tab_hist:
             renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
         
         st.divider()
+        # Ordenar o dataframe por data para o histórico ficar organizado
+        df_h = df_h.sort_values(by='Data_dt', ascending=False)
         st.dataframe(df_h.drop(columns=['Data_dt']), use_container_width=True)
     else:
         st.info("Sem dados no histórico.")
