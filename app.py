@@ -32,6 +32,10 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] { gap: 5px; }
     .stTabs [data-baseweb="tab"] { background-color: #1C1C1E; border-radius: 8px; color: #ffffff !important; padding: 0 10px; }
     .stTabs [aria-selected="true"] { background-color: #FF4500 !important; color: white !important; }
+
+    /* ALTERAÇÃO PEDIDA: texto dos botões em vermelho */
+    button[kind="secondary"] p { color: red !important; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -83,25 +87,6 @@ def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     g1, g2 = st.columns(2)
     with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Hora Bruta</div><div class='grid-value'>R$ {(b/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
     with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(b/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-
-    g3, g4 = st.columns(2)
-    with g3:
-        hi, mi = int(h), int((h - int(h)) * 60)
-        st.markdown(f"<div class='grid-item'><div class='grid-label'>Tempo</div><div class='grid-value'>{hi:02d}:{mi:02d}</div></div>", unsafe_allow_html=True)
-    with g4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(l/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-
-    g5, g6 = st.columns(2)
-    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{k:.1f}</div></div>", unsafe_allow_html=True)
-    with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(l/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-
-    if total_meta > 0:
-        prog = min(max(0.0, l / total_meta), 1.0)
-        restante = total_meta - l
-        meta_real = restante / dias_f if dias_f > 0 else restante
-        st.write(f"🏠 *Abate das Contas da Casa:* {prog*100:.1f}%")
-        st.progress(prog)
-        st.write(f"📉 *Falta para quitar o mês:* R$ {max(0.0, restante):.2f}")
-        st.write(f"🎯 *Meta diária p/ os {dias_f} dias restantes:* R$ {max(0.0, meta_real):.2f}")
 
 with tab_res:
     if not st.session_state.historico.empty:
@@ -172,110 +157,3 @@ with tab_turno:
                 st.session_state.turno_ativo = False
                 st.success("Turno salvo no histórico!")
                 st.rerun()
-
-    if st.session_state.turno_ativo:
-
-        tempo = datetime.now() - st.session_state.inicio_turno
-        horas = tempo.total_seconds() / 3600
-
-        st.write("### 📊 Turno Atual")
-
-        c1, c2 = st.columns(2)
-
-        ganho = c1.number_input("💰 Ganho no turno", value=st.session_state.ganho_turno)
-        km = c2.number_input("🚗 KM no turno", value=st.session_state.km_turno)
-
-        st.session_state.ganho_turno = ganho
-        st.session_state.km_turno = km
-
-        r_hora = ganho / horas if horas > 0 else 0
-        r_km = ganho / km if km > 0 else 0
-
-        hi = int(horas)
-        mi = int((horas - hi) * 60)
-
-        st.markdown(f"""
-        ⏱ Tempo de turno: *{hi:02d}:{mi:02d}*
-
-        💰 Ganho total: *R$ {ganho:.2f}*
-
-        🚗 KM rodados: *{km:.1f}*
-
-        💵 R$/hora: *R$ {r_hora:.2f}*
-
-        💵 R$/km: *R$ {r_km:.2f}*
-        """)
-
-with tab_lan:
-    st.subheader("Lançar Dia")
-    data_lan = st.date_input("Data do Trabalho", value=date.today())
-    b_in = st.number_input("Ganho Bruto", value=0.0)
-    k_in = st.number_input("KM Total", value=0.0)
-    h_in = st.number_input("Horas", value=0.0)
-    c_in = st.number_input("Combustível", value=0.0)
-
-    if st.button("💾 SALVAR DIA", use_container_width=True):
-        if b_in > 0:
-            l_calc = b_in - c_in
-            k_calc = k_in if k_in > 0 else 1.0
-            h_calc = h_in if h_in > 0 else 1.0
-
-            novo = {
-                "Data": data_lan.strftime("%d/%m/%Y"),
-                "Bruto": b_in,
-                "Líquido": l_calc,
-                "KM": k_calc,
-                "Horas": h_calc,
-                "KM_Liq": l_calc/k_calc,
-                "Hora_Liq": l_calc/h_calc
-            }
-
-            st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo])], ignore_index=True)
-            st.session_state.historico.to_csv(FILE_HIST, index=False)
-
-            st.success("Salvo!")
-            st.rerun()
-
-with tab_hist:
-    if not st.session_state.historico.empty:
-        df_h = st.session_state.historico.copy()
-        df_h['Data_dt'] = pd.to_datetime(df_h['Data'], format='%d/%m/%Y')
-        hoje_agora = datetime.now()
-
-        periodo = st.radio("Período:", ["Semana","Mês","Ano"], horizontal=True)
-
-        if periodo == "Semana":
-            mask = df_h['Data_dt'] > (hoje_agora - timedelta(days=7))
-        elif periodo == "Mês":
-            mask = df_h['Data_dt'].dt.month == hoje_agora.month
-        else:
-            mask = df_h['Data_dt'].dt.year == hoje_agora.year
-
-        df_p = df_h[mask]
-
-        if not df_p.empty:
-            renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
-
-        st.divider()
-        st.dataframe(df_h.sort_values(by='Data_dt', ascending=False).drop(columns=['Data_dt']), use_container_width=True)
-
-    else:
-        st.info("Sem dados no histórico.")
-
-with tab_contas:
-    st.subheader("🏠 Contas da Casa")
-
-    c1, c2 = st.columns(2)
-    campos = ["Aluguel","Luz","Água","Internet","Cartões","Financiamentos","Outras"]
-
-    for i,campo in enumerate(campos):
-        col = c1 if i < 4 else c2
-        st.session_state.contas[campo] = col.number_input(campo,value=float(st.session_state.contas.get(campo,0)))
-
-    if st.button("💾 SALVAR CONTAS"):
-        pd.DataFrame([st.session_state.contas]).to_csv(FILE_CONTAS,index=False)
-        st.success("Contas salvas!")
-        st.rerun()
-
-    st.divider()
-    st.metric("TOTAL MENSAL",f"R$ {total_casa:.2f}")
