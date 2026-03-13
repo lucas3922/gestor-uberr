@@ -122,35 +122,59 @@ with tab_lan:
         st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo])], ignore_index=True)
         st.success("Ganho salvo!")
 
-# --- ABA 3: HISTÓRICO (Com opções de Período) ---
+# --- ABA 3: HISTÓRICO (VISUAL IGUAL RESULTADOS) ---
 with tab_hist:
-    st.subheader("Resumo de Performance")
     if not st.session_state.historico.empty:
-        df = st.session_state.historico
-        # Conversão de data para cálculos de período
+        df = st.session_state.historico.copy()
         df['Data_dt'] = pd.to_datetime(df['Data'], format='%d/%m/%Y')
         hoje = datetime.now()
-        
-        # Filtros de períodos (Últimos 7 dias, Mês Atual, Ano Atual)
-        ganho_7d = df[df['Data_dt'] > (hoje - pd.Timedelta(days=7))]['Líquido'].sum()
-        ganho_mes = df[df['Data_dt'].dt.month == hoje.month]['Líquido'].sum()
-        ganho_ano = df[df['Data_dt'].dt.year == hoje.year]['Líquido'].sum()
 
-        # Exibição dos ganhos por período em colunas
-        c_p1, c_p2, c_p3 = st.columns(3)
-        with c_p1: st.metric("Semanal (7d)", f"R$ {ganho_7d:.2f}")
-        with c_p2: st.metric("Mensal", f"R$ {ganho_mes:.2f}")
-        with c_p3: st.metric("Anual", f"R$ {ganho_ano:.2f}")
+        # Seletor de período estilizado
+        periodo = st.radio("Ver período:", ["Semana", "Mês", "Ano"], horizontal=True)
+
+        if periodo == "Semana":
+            df_filtrado = df[df['Data_dt'] > (hoje - pd.Timedelta(days=7))]
+            txt_p = "Faturamento Semana"
+        elif periodo == "Mês":
+            df_filtrado = df[df['Data_dt'].dt.month == hoje.month]
+            txt_p = "Faturamento Mês"
+        else:
+            df_filtrado = df[df['Data_dt'].dt.year == hoje.year]
+            txt_p = "Faturamento Ano"
+
+        # Cálculos do Período
+        bruto_p = df_filtrado['Bruto'].sum()
+        liq_p = df_filtrado['Líquido'].sum()
+        gastos_p = bruto_p - liq_p
         
+        km_p = df_filtrado['KM'].sum()
+        horas_p = df_filtrado['Horas'].sum()
+        viagens_p = len(df_filtrado)
+
+        # Visual de Quadrados (Mesmo da aba Resultados)
+        st.markdown(f"<div class='card-faturamento'><div class='label-card'>{txt_p}</div><div class='big-val'>R$ {bruto_p:.2f}</div></div>", unsafe_allow_html=True)
+        
+        c_p1, c_p2 = st.columns(2)
+        with c_p1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Total Despesas</div><div class='big-val'>R$ {gastos_p:.2f}</div></div>", unsafe_allow_html=True)
+        with c_p2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Total Líquido</div><div class='big-val'>R$ {liq_p:.2f}</div></div>", unsafe_allow_html=True)
+        
+        st.write("")
+        # Grade de Quadrados
+        hg1, hg2, hg3 = st.columns(3)
+        with hg1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Dias Rodados</div><div class='grid-value'>{viagens_p}</div></div>", unsafe_allow_html=True)
+        with hg2: st.markdown(f"<div class='grid-item'><div class='grid-label'>Média KM/Dia</div><div class='grid-value'>{(km_p/viagens_p):.1f}</div></div>", unsafe_allow_html=True) if viagens_p > 0 else st.empty()
+        with hg3: st.markdown(f"<div class='grid-item'><div class='grid-label'>Horas Totais</div><div class='grid-value'>{horas_p:.1f}h</div></div>", unsafe_allow_html=True)
+
+        hg4, hg5, hg6 = st.columns(3)
+        with hg4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora Médio</div><div class='grid-value'>R$ {(liq_p/horas_p):.2f}</div></div>", unsafe_allow_html=True) if horas_p > 0 else st.empty()
+        with hg5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Total</div><div class='grid-value'>{km_p}</div></div>", unsafe_allow_html=True)
+        with hg6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM Médio</div><div class='grid-value'>R$ {(liq_p/km_p):.2f}</div></div>", unsafe_allow_html=True) if km_p > 0 else st.empty()
+
         st.divider()
-        st.write("📊 *Histórico Detalhado (Diário)*")
+        st.write("📋 *Lista Completa*")
         st.dataframe(df.drop(columns=['Data_dt']), use_container_width=True)
-        
-        if st.button("Limpar Tudo"):
-            st.session_state.historico = pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas", "KM_Liq", "Hora_Liq"])
-            st.rerun()
     else:
-        st.info("Lance dados para ver os resumos por período.")
+        st.info("Nenhum dado no histórico.")
 
 # --- ABA 4: CONTAS ---
 with tab_contas:
