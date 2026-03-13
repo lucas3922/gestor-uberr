@@ -140,8 +140,38 @@ with tab_turno:
     with col2:
         if st.session_state.turno_ativo:
             if st.button("⏹ ENCERRAR TURNO", use_container_width=True):
+
+                tempo = datetime.now() - st.session_state.inicio_turno
+                horas = tempo.total_seconds() / 3600
+
+                ganho = st.session_state.ganho_turno
+                km = st.session_state.km_turno
+
+                if ganho > 0:
+
+                    k_calc = km if km > 0 else 1.0
+                    h_calc = horas if horas > 0 else 1.0
+
+                    novo = {
+                        "Data": date.today().strftime("%d/%m/%Y"),
+                        "Bruto": ganho,
+                        "Líquido": ganho,
+                        "KM": k_calc,
+                        "Horas": h_calc,
+                        "KM_Liq": ganho/k_calc,
+                        "Hora_Liq": ganho/h_calc
+                    }
+
+                    st.session_state.historico = pd.concat(
+                        [st.session_state.historico, pd.DataFrame([novo])],
+                        ignore_index=True
+                    )
+
+                    st.session_state.historico.to_csv(FILE_HIST, index=False)
+
                 st.session_state.turno_ativo = False
-                st.success("Turno encerrado!")
+                st.success("Turno salvo no histórico!")
+                st.rerun()
 
     if st.session_state.turno_ativo:
 
