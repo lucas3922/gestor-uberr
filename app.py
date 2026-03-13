@@ -19,6 +19,9 @@ st.markdown("""
     header {visibility: hidden;}
     footer {visibility: hidden;}
 
+    /* Cor das letras para branco em todo o app */
+    label, p, span, h1, h2, h3, .stMarkdown { color: #ffffff !important; }
+
     /* Forçar colunas lado a lado no celular */
     [data-testid="column"] {
         width: 33% !important;
@@ -27,9 +30,9 @@ st.markdown("""
     }
 
     /* Cartões Coloridos */
-    .card-faturamento { background-color: #00FF00; color: black; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 10px; width: 100% !important; }
-    .card-despesa { background-color: #FF0000; color: white; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
-    .card-saldo { background-color: #800080; color: white; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
+    .card-faturamento { background-color: #00FF00; color: black !important; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 10px; width: 100% !important; }
+    .card-despesa { background-color: #FF0000; color: white !important; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
+    .card-saldo { background-color: #800080; color: white !important; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
     
     .big-val { font-size: 20px; font-weight: bold; }
     .label-card { font-size: 10px; font-weight: 600; text-transform: uppercase; }
@@ -47,15 +50,15 @@ st.markdown("""
         flex-direction: column;
         justify-content: center;
     }
-    .grid-label { color: #8E8E93; font-size: 9px; font-weight: bold; text-transform: uppercase; }
-    .grid-value { color: #FFFFFF; font-size: 14px; font-weight: bold; }
+    .grid-label { color: #ffffff !important; font-size: 9px; font-weight: bold; text-transform: uppercase; opacity: 0.8; }
+    .grid-value { color: #FFFFFF !important; font-size: 14px; font-weight: bold; }
 
     /* Estilo das Tabs */
     .stTabs [data-baseweb="tab-list"] { gap: 5px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #1C1C1E;
         border-radius: 8px;
-        color: #8E8E93;
+        color: #ffffff !important;
         padding: 0 10px;
     }
     .stTabs [aria-selected="true"] {
@@ -69,21 +72,15 @@ st.markdown("""
 if 'historico' not in st.session_state:
     st.session_state.historico = pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas", "KM_Liq", "Hora_Liq"])
 
-# Dicionário de contas com nomes simplificados para evitar erros de chave
 if 'contas' not in st.session_state:
     st.session_state.contas = {
-        "Aluguel": 0.0, 
-        "Luz": 0.0, 
-        "Água": 0.0, 
-        "Internet": 0.0, 
-        "Cartões": 0.0, 
-        "Financiamentos": 0.0, 
-        "Outras": 0.0
+        "Aluguel": 0.0, "Luz": 0.0, "Água": 0.0, "Internet": 0.0, 
+        "Cartões": 0.0, "Financiamentos": 0.0, "Outras": 0.0
     }
 
 if 'bruto' not in st.session_state: st.session_state.bruto = 0.0
-if 'km' not in st.session_state: st.session_state.km = 1.0
-if 'horas' not in st.session_state: st.session_state.horas = 1.0
+if 'km' not in st.session_state: st.session_state.km = 0.0
+if 'horas' not in st.session_state: st.session_state.horas = 0.0
 if 'comb' not in st.session_state: st.session_state.comb = 0.0
 
 # --- CÁLCULOS TÉCNICOS ---
@@ -92,7 +89,7 @@ liq = st.session_state.bruto - st.session_state.comb
 km_b = st.session_state.bruto / st.session_state.km if st.session_state.km > 0 else 0
 km_l = liq / st.session_state.km if st.session_state.km > 0 else 0
 hr_l = liq / st.session_state.horas if st.session_state.horas > 0 else 0
-viagens = max(1, round(st.session_state.bruto / 35)) if st.session_state.bruto > 0 else 0
+viagens = max(0, round(st.session_state.bruto / 35)) if st.session_state.bruto > 0 else 0
 
 # --- ABAS ---
 tab_res, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
@@ -125,10 +122,11 @@ with tab_res:
 # --- ABA 2: LANÇAR ---
 with tab_lan:
     st.subheader("Lançar Dia")
-    st.session_state.bruto = st.number_input("Ganho Bruto", value=st.session_state.bruto)
-    st.session_state.km = st.number_input("KM Total", value=st.session_state.km)
-    st.session_state.horas = st.number_input("Horas", value=st.session_state.horas)
-    st.session_state.comb = st.number_input("Combustível", value=st.session_state.comb)
+    # Números começam em 0.0 para facilitar a digitação direta
+    st.session_state.bruto = st.number_input("Ganho Bruto", value=0.0)
+    st.session_state.km = st.number_input("KM Total", value=0.0)
+    st.session_state.horas = st.number_input("Horas", value=0.0)
+    st.session_state.comb = st.number_input("Combustível", value=0.0)
     
     if st.button("💾 SALVAR DIA", use_container_width=True):
         novo = {"Data": datetime.now().strftime("%d/%m/%Y"), "Bruto": st.session_state.bruto, "Líquido": liq, "KM": st.session_state.km, "Horas": st.session_state.horas, "KM_Liq": km_l, "Hora_Liq": hr_l}
@@ -190,15 +188,14 @@ with tab_contas:
     
     col1, col2 = st.columns(2)
     with col1:
-        st.session_state.contas["Aluguel"] = st.number_input("Aluguel", value=st.session_state.contas["Aluguel"])
-        st.session_state.contas["Luz"] = st.number_input("Conta de Luz", value=st.session_state.contas["Luz"])
-        st.session_state.contas["Água"] = st.number_input("Conta de Água", value=st.session_state.contas["Água"])
-        st.session_state.contas["Internet"] = st.number_input("Internet", value=st.session_state.contas["Internet"])
+        st.session_state.contas["Aluguel"] = st.number_input("Aluguel", value=0.0)
+        st.session_state.contas["Luz"] = st.number_input("Conta de Luz", value=0.0)
+        st.session_state.contas["Água"] = st.number_input("Conta de Água", value=0.0)
+        st.session_state.contas["Internet"] = st.number_input("Internet", value=0.0)
     with col2:
-        # Note que aqui usamos a chave exata "Cartões"
-        st.session_state.contas["Cartões"] = st.number_input("Cartões de Crédito", value=st.session_state.contas["Cartões"])
-        st.session_state.contas["Financiamentos"] = st.number_input("Financiamentos", value=st.session_state.contas["Financiamentos"])
-        st.session_state.contas["Outras"] = st.number_input("Outras Contas", value=st.session_state.contas["Outras"])
+        st.session_state.contas["Cartões"] = st.number_input("Cartões de Crédito", value=0.0)
+        st.session_state.contas["Financiamentos"] = st.number_input("Financiamentos", value=0.0)
+        st.session_state.contas["Outras"] = st.number_input("Outras Contas", value=0.0)
     
     st.divider()
     st.metric("TOTAL DE DESPESAS", f"R$ {total_casa:.2f}")
