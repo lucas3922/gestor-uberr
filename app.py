@@ -64,7 +64,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- PERSISTÊNCIA DE DADOS (BANCO DE DADOS SIMPLES) ---
+# --- PERSISTÊNCIA ---
 FILE_HIST = "dados_uber.csv"
 FILE_CONTAS = "contas_uber.csv"
 
@@ -79,45 +79,37 @@ def carregar_contas():
         return df.iloc[0].to_dict()
     return {"Aluguel": 0.0, "Luz": 0.0, "Água": 0.0, "Internet": 0.0, "Cartões": 0.0, "Financiamentos": 0.0, "Outras": 0.0}
 
-# --- INICIALIZAÇÃO ---
 if 'historico' not in st.session_state:
     st.session_state.historico = carregar_dados()
 
 if 'contas' not in st.session_state:
     st.session_state.contas = carregar_contas()
 
-# Cálculo de dias restantes no mês
 hoje_ref = date.today()
 ultimo_dia = calendar.monthrange(hoje_ref.year, hoje_ref.month)[1]
 dias_restantes = (ultimo_dia - hoje_ref.day) + 1
-
 total_casa = sum(v for v in st.session_state.contas.values() if v is not None)
 
 tab_res, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
 
-# --- FUNÇÃO VISUAL PADRÃO ---
 def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     c = b - l
     st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento {titulo_aba}</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
     c_sub1, c_sub2 = st.columns(2)
     with c_sub1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {c:.2f}</div></div>", unsafe_allow_html=True)
     with c_sub2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {l:.2f}</div></div>", unsafe_allow_html=True)
-    
     st.write("")
     g1, g2 = st.columns(2)
     with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Hora Bruta</div><div class='grid-value'>R$ {(b/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
     with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(b/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-
     g3, g4 = st.columns(2)
     with g3: 
         hi, mi = int(h), int((h - int(h)) * 60)
         st.markdown(f"<div class='grid-item'><div class='grid-label'>Tempo</div><div class='grid-value'>{hi:02d}:{mi:02d}</div></div>", unsafe_allow_html=True)
     with g4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(l/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-
     g5, g6 = st.columns(2)
-    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{k}</div></div>", unsafe_allow_html=True)
+    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{k:.1f}</div></div>", unsafe_allow_html=True)
     with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(l/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-
     if total_meta > 0:
         prog = min(max(0.0, l / total_meta), 1.0)
         restante = total_meta - l
@@ -127,7 +119,6 @@ def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
         st.write(f"📉 *Falta para quitar o mês:* R$ {max(0.0, restante):.2f}")
         st.write(f"🎯 *Meta diária p/ os {dias_f} dias restantes:* R$ {max(0.0, meta_real):.2f}")
 
-# --- ABAS ---
 with tab_res:
     if not st.session_state.historico.empty:
         u = st.session_state.historico.iloc[-1]
@@ -142,7 +133,6 @@ with tab_lan:
     k_in = st.number_input("KM Total", value=None, placeholder=" ")
     h_in = st.number_input("Horas", value=None, placeholder=" ")
     c_in = st.number_input("Combustível", value=None, placeholder=" ")
-    
     if st.button("💾 SALVAR DIA", use_container_width=True):
         if b_in is not None:
             l_calc = b_in - (c_in or 0.0)
@@ -150,7 +140,6 @@ with tab_lan:
             h_calc = h_in or 1.0
             novo = {"Data": data_lan.strftime("%d/%m/%Y"), "Bruto": b_in, "Líquido": l_calc, "KM": k_calc, "Horas": h_calc, "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc}
             st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo])], ignore_index=True)
-            # SALVAR NO ARQUIVO
             st.session_state.historico.to_csv(FILE_HIST, index=False)
             st.success(f"Dia {data_lan.strftime('%d/%m')} salvo!")
             st.rerun()
@@ -181,18 +170,17 @@ with tab_contas:
     st.subheader("🏠 Contas da Casa")
     c1, c2 = st.columns(2)
     with c1:
-        st.session_state.contas["Aluguel"] = st.number_input("Aluguel", value=float(st.session_state.contas["Aluguel"] or 0))
-        st.session_state.contas["Luz"] = st.number_input("Luz", value=float(st.session_state.contas["Luz"] or 0))
-        st.session_state.contas["Água"] = st.number_input("Água", value=float(st.session_state.contas["Água"] or 0))
-        st.session_state.contas["Internet"] = st.number_input("Internet", value=float(st.session_state.contas["Internet"] or 0))
+        st.session_state.contas["Aluguel"] = st.number_input("Aluguel", value=float(st.session_state.contas.get("Aluguel", 0)))
+        st.session_state.contas["Luz"] = st.number_input("Luz", value=float(st.session_state.contas.get("Luz", 0)))
+        st.session_state.contas["Água"] = st.number_input("Água", value=float(st.session_state.contas.get("Água", 0)))
+        st.session_state.contas["Internet"] = st.number_input("Internet", value=float(st.session_state.contas.get("Internet", 0)))
     with c2:
-        st.session_state.contas["Cartões"] = st.number_input("Cartões", value=float(st.session_state.contas["Cartões"] or 0))
-        st.session_state.contas["Financiamentos"] = st.number_input("Financiamentos", value=float(st.session_state.contas["Financiamentos"] or 0))
-        st.session_state.contas["Outras"] = st.number_input("Outras", value=float(st.session_state.contas["Outras"] or 0))
-    
+        st.session_state.contas["Cartões"] = st.number_input("Cartões", value=float(st.session_state.contas.get("Cartões", 0)))
+        st.session_state.contas["Financiamentos"] = st.number_input("Financiamentos", value=float(st.session_state.contas.get("Financiamentos", 0)))
+        st.session_state.contas["Outras"] = st.number_input("Outras", value=float(st.session_state.contas.get("Outras", 0)))
     if st.button("💾 SALVAR CONTAS"):
         pd.DataFrame([st.session_state.contas]).to_csv(FILE_CONTAS, index=False)
-        st.success("Contas salvas com sucesso!")
+        st.success("Contas salvas!")
         st.rerun()
     st.divider()
     st.metric("TOTAL MENSAL", f"R$ {total_casa:.2f}")
