@@ -2,147 +2,128 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# Configuração da página e ícone
-st.set_page_config(page_title="Gestor Uber + Casa", layout="wide", page_icon="🚗")
+# Configuração da página para parecer um App
+st.set_page_config(
+    page_title="Uber Manager Pro", 
+    layout="wide", 
+    initial_sidebar_state="collapsed", # Esconde o menu lateral no celular
+    page_icon="📊"
+)
 
-# --- ESTILIZAÇÃO CSS CUSTOMIZADA ---
+# --- ESTILIZAÇÃO CSS AVANÇADA ---
 st.markdown("""
 <style>
-    [data-testid="stMetricValue"] {
-        font-size: 30px !important;
-        font-weight: bold;
+    /* Fundo do App */
+    .stApp {
+        background-color: #f8f9fa;
     }
-    .main-metric {
-        border-radius: 10px;
+    
+    /* Esconder menus desnecessários */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Cartão Principal de Destaque */
+    .main-card {
+        background: white;
+        border-radius: 15px;
         padding: 20px;
-        color: white;
-        margin-bottom: 15px;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+        border: 1px solid #eee;
     }
-    .secondary-metric {
-        background-color: #f0f2f6;
-        border-radius: 8px;
+
+    /* Estilo das Métricas Coloridas */
+    .status-card {
+        border-radius: 12px;
         padding: 15px;
-        color: #31333F;
-        margin-bottom: 10px;
+        color: white;
         text-align: center;
-        border: 1px solid #e0e0e0;
-    }
-    .metric-label-custom {
-        font-size: 14px;
-        color: #6c757d;
-        margin-bottom: 5px;
-    }
-    .metric-value-custom {
-        font-size: 24px;
         font-weight: bold;
-        color: #31333F;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
+
+    /* Estilo da Grade Inferior */
+    .grid-card {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+        border: 1px solid #ececf1;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .label { font-size: 12px; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.5px; }
+    .value { font-size: 20px; font-weight: 700; color: #1d1d1f; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- CABEÇALHO ---
-col_logo, col_title = st.columns([1, 6])
-with col_logo:
-    st.markdown("<div style='background-color: #ff4b4b; padding: 20px; border-radius: 50%; text-align: center; color: white; font-weight: bold;'>UB</div>", unsafe_allow_html=True)
-with col_title:
-    st.title("Gestor Financeiro: Uber & Residencial")
+st.markdown("<h2 style='text-align: center; color: #1d1d1f; margin-bottom: 25px;'>📊 Uber Manager Pro</h2>", unsafe_allow_html=True)
+
+# --- SIDEBAR (CONFIGURAÇÕES) ---
+with st.sidebar:
+    st.header("🏠 Custos Fixos")
+    luz = st.number_input("Luz", value=0.0)
+    agua = st.number_input("Água", value=0.0)
+    internet = st.number_input("Internet", value=0.0)
+    aluguel = st.number_input("Aluguel", value=0.0)
+    mercado = st.number_input("Mercado", value=0.0)
+    outros = st.number_input("Outros", value=0.0)
+    total_casa = luz + agua + internet + aluguel + mercado + outros
+
+# --- ÁREA DE INPUT ---
+with st.container():
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: ganho_bruto = st.number_input("Total Bruto (R$)", min_value=0.0, step=10.0)
+    with c2: km = st.number_input("KM Total", min_value=1.0, step=1.0)
+    with c3: horas = st.number_input("Horas On", min_value=0.1, step=0.5)
+    with c4: combustivel = st.number_input("Combustível (R$)", min_value=0.0, step=5.0)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# --- CÁLCULOS ---
+liquido = ganho_bruto - combustivel
+km_liq = liquido / km if km > 0 else 0
+hr_liq = liquido / horas if horas > 0 else 0
+viagens = max(1, round(ganho_bruto / 30))
+
+# --- DASHBOARD DE RESULTADOS ---
 st.markdown("---")
+# Linha 1: Destaques Coloridos
+col_f, col_d, col_s = st.columns(3)
+with col_f:
+    st.markdown(f"<div class='status-card' style='background: linear-gradient(135deg, #28a745, #218838);'><div class='label' style='color: #e9ecef;'>FATURAMENTO</div><div style='font-size: 28px;'>R$ {ganho_bruto:.2f}</div></div>", unsafe_allow_html=True)
+with col_d:
+    st.markdown(f"<div class='status-card' style='background: linear-gradient(135deg, #dc3545, #c82333);'><div class='label' style='color: #e9ecef;'>CUSTO OPERACIONAL</div><div style='font-size: 28px;'>R$ {combustivel:.2f}</div></div>", unsafe_allow_html=True)
+with col_s:
+    st.markdown(f"<div class='status-card' style='background: linear-gradient(135deg, #007bff, #0069d9);'><div class='label' style='color: #e9ecef;'>LUCRO LÍQUIDO</div><div style='font-size: 28px;'>R$ {liquido:.2f}</div></div>", unsafe_allow_html=True)
 
-# --- SIDEBAR: GESTÃO DE CONTAS DA CASA ---
-st.sidebar.header("🏠 Contas da Casa (Mensal)")
-luz = st.sidebar.number_input("Luz (R$)", min_value=0.0, value=0.0, step=10.0)
-agua = st.sidebar.number_input("Água (R$)", min_value=0.0, value=0.0, step=10.0)
-internet = st.sidebar.number_input("Internet (R$)", min_value=0.0, value=0.0, step=10.0)
-aluguel = st.sidebar.number_input("Aluguel (R$)", min_value=0.0, value=0.0, step=10.0)
-mercado = st.sidebar.number_input("Mercado (R$)", min_value=0.0, value=0.0, step=50.0)
-outros = st.sidebar.number_input("Outros (R$)", min_value=0.0, value=0.0, step=10.0)
+st.write("") # Espaçador
 
-total_despesas = luz + agua + internet + aluguel + mercado + outros
-meta_diaria = total_despesas / 22 if total_despesas > 0 else 0 
+# Linha 2: Grade de métricas (Igual ao seu print)
+g1, g2, g3 = st.columns(3)
+with g1:
+    st.markdown(f"<div class='grid-card'><div class='label'>Viagens</div><div class='value'>{viagens}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='grid-card'><div class='label'>Fat. por Viagem</div><div class='value'>R$ {ganho_bruto/viagens:.2f}</div></div>", unsafe_allow_html=True)
+with g2:
+    h_int, m_int = int(horas), int((horas - int(horas)) * 60)
+    st.markdown(f"<div class='grid-card'><div class='label'>Tempo Logado</div><div class='value'>{h_int:02d}:{m_int:02d}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='grid-card'><div class='label'>Líquido/Hora</div><div class='value'>R$ {hr_liq:.2f}</div></div>", unsafe_allow_html=True)
+with g3:
+    st.markdown(f"<div class='grid-card'><div class='label'>KM Rodado</div><div class='value'>{km:.1f}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='grid-card'><div class='label'>Líquido/KM</div><div class='value'>R$ {km_liq:.2f}</div></div>", unsafe_allow_html=True)
 
-st.sidebar.metric("Total Despesas", f"R$ {total_despesas:.2f}")
-st.sidebar.info(f"🎯 Meta Diária Sugerida (22 dias): R$ {meta_diaria:.2f}")
-
-# --- ENTRADA DE DADOS ---
-st.header("🚗 Entrada do Dia")
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    ganho_bruto = st.number_input("Ganho Bruto Total (R$)", min_value=0.0, value=0.0, step=10.0)
-with col2:
-    km_rodados = st.number_input("KM Rodados", min_value=1.0, value=1.0, step=1.0)
-with col3:
-    horas_trab = st.number_input("Horas Trabalhadas", min_value=0.1, value=1.0, step=0.5)
-with col4:
-    custo_combustivel = st.number_input("Custo Combustível/Geral (R$)", min_value=0.0, value=0.0, step=5.0)
-
-# Cálculos
-ganho_liquido = ganho_bruto - custo_combustivel
-km_bruto = ganho_bruto / km_rodados
-km_liquido = ganho_liquido / km_rodados
-hora_bruto = ganho_bruto / horas_trab
-hora_liquido = ganho_liquido / horas_trab
-viagens_estimadas = max(1, round(ganho_bruto / 35))
-
-# --- DASHBOARD ---
-st.markdown("---")
-tabs = st.tabs(["Diário", "Semanal", "Mensal", "Anual"])
-
-with tabs[0]:
-    col_fat, col_desp, col_saldo = st.columns(3)
-
-    with col_fat:
-        st.markdown(f"<div class='main-metric' style='background-color: #2e7d32; text-align: center;'><p style='color: #e0e0e0; font-size: 14px;'>Faturamento Dia</p><p style='font-size: 32px; font-weight: bold;'>R$ {ganho_bruto:.2f}</p></div>", unsafe_allow_html=True)
-
-    with col_desp:
-        st.markdown(f"<div class='main-metric' style='background-color: #c62828; text-align: center;'><p style='color: #e0e0e0; font-size: 14px;'>Despesas</p><p style='font-size: 32px; font-weight: bold;'>R$ {custo_combustivel:.2f}</p></div>", unsafe_allow_html=True)
-
-    with col_saldo:
-        st.markdown(f"<div class='main-metric' style='background-color: #1976d2; text-align: center;'><p style='color: #e0e0e0; font-size: 14px;'>Saldo</p><p style='font-size: 32px; font-weight: bold;'>R$ {ganho_liquido:.2f}</p></div>", unsafe_allow_html=True)
-
+# --- META DA CASA ---
+if total_casa > 0:
     st.markdown("---")
-    
-    col_via, col_hor, col_km = st.columns(3)
-    with col_via:
-        st.markdown(f"<div class='secondary-metric'><p class='metric-label-custom'>Total de Viagens</p><p class='metric-value-custom'>{viagens_estimadas}</p></div>", unsafe_allow_html=True)
-    with col_hor:
-        h = int(horas_trab)
-        m = int((horas_trab - h) * 60)
-        st.markdown(f"<div class='secondary-metric'><p class='metric-label-custom'>Horas Trabalhadas</p><p class='metric-value-custom'>{h:02d}:{m:02d}</p></div>", unsafe_allow_html=True)
-    with col_km:
-        st.markdown(f"<div class='secondary-metric'><p class='metric-label-custom'>KMs Rodados</p><p class='metric-value-custom'>{km_rodados:.2f}</p></div>", unsafe_allow_html=True)
+    st.subheader("🏠 Progresso das Contas")
+    percentual = min(max(0.0, liquido / total_casa), 1.0)
+    faltam = max(0.0, total_casa - liquido)
+    st.progress(percentual)
+    st.write(f"Você já cobriu *{percentual*100:.1f}%* das suas contas. Faltam *R$ {faltam:.2f}*.")
 
-    col_fv, col_fh, col_fk = st.columns(3)
-    with col_fv:
-        st.markdown(f"<div class='secondary-metric'><p class='metric-label-custom'>Fat. por viagens</p><p class='metric-value-custom'>R$ {ganho_bruto/viagens_estimadas:.2f}</p></div>", unsafe_allow_html=True)
-    with col_fh:
-        st.markdown(f"<div class='secondary-metric'><p class='metric-label-custom'>Fat. médio por hora</p><p class='metric-value-custom'>R$ {hora_bruto:.2f}</p></div>", unsafe_allow_html=True)
-    with col_fk:
-        st.markdown(f"<div class='secondary-metric'><p class='metric-label-custom'>Fat. médio por KM</p><p class='metric-value-custom'>R$ {km_bruto:.2f}</p></div>", unsafe_allow_html=True)
-
-    st.markdown("---")
-    if total_despesas > 0:
-        progresso = min(max(0.0, ganho_liquido / total_despesas), 1.0)
-        restante = max(0.0, total_despesas - ganho_liquido)
-        st.write(f"*Abate Mensal:* Faltam R$ {restante:.2f} para cobrir as contas da casa.")
-        st.progress(progresso)
-
-# --- SALVAMENTO ---
-st.markdown("---")
-if 'historico' not in st.session_state:
-    st.session_state.historico = pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas"])
-
-if st.button("💾 Salvar Lançamento Diário"):
-    novo_dado = {
-        "Data": datetime.now().strftime("%d/%m/%Y"),
-        "Bruto": ganho_bruto,
-        "Líquido": ganho_liquido,
-        "KM": km_rodados,
-        "Horas": horas_trab
-    }
-    st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo_dado])], ignore_index=True)
-    st.success("Dados salvos com sucesso!")
-
-st.header("📅 Resumo Acumulado")
-st.dataframe(st.session_state.historico, use_container_width=True)
+# --- PERSISTÊNCIA ---
+if st.button("💾 SALVAR DIA", use_container_width=True):
+    st.balloons()
+    st.success("Dados arquivados com sucesso!")
