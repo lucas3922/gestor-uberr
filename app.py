@@ -19,14 +19,17 @@ st.markdown("""
     header {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Forçar colunas lado a lado no celular (Necessário para a grade 2x3) */
+    /* Cor das letras para branco em todo o app */
+    label, p, span, h1, h2, h3, .stMarkdown { color: #ffffff !important; }
+
+    /* Forçar colunas lado a lado no celular - Ajustado para 2 colunas */
     [data-testid="column"] {
         width: 50% !important;
         flex: 1 1 45% !important;
         min-width: 45% !important;
     }
 
-    /* Cartões Coloridos Estilo Print */
+    /* Cartões Coloridos */
     .card-faturamento { background-color: #00FF00; color: black !important; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 10px; width: 100% !important; }
     .card-despesa { background-color: #FF0000; color: white !important; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
     .card-saldo { background-color: #800080; color: white !important; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
@@ -34,20 +37,19 @@ st.markdown("""
     .big-val { font-size: 20px; font-weight: bold; }
     .label-card { font-size: 10px; font-weight: 600; text-transform: uppercase; }
 
-    /* Grade de métricas em quadrados (2 Colunas) */
+    /* Grade de métricas em quadrados */
     .grid-item {
         background-color: #1C1C1E;
         border-radius: 12px;
-        padding: 10px 5px;
+        padding: 10px 2px;
         text-align: center;
         border: 1px solid #2C2C2E;
-        margin-bottom: 8px;
-        min-height: 80px;
+        margin-bottom: 5px;
+        min-height: 85px;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
-    /* Letras brancas e mais visíveis nos quadrados */
     .grid-label { color: #ffffff !important; font-size: 9px; font-weight: bold; text-transform: uppercase; opacity: 0.8; }
     .grid-value { color: #FFFFFF !important; font-size: 14px; font-weight: bold; }
 
@@ -77,105 +79,82 @@ if 'contas' not in st.session_state:
     }
 
 # --- CÁLCULOS TÉCNICOS ---
-# Cálculo seguro das contas (ignora None)
-total_casa = sum(v if v is not None else 0.0 for v in st.session_state.contas.values())
+# Soma ignorando campos vazios (None)
+total_casa = sum(v for v in st.session_state.contas.values() if v is not None)
 
 # --- ABAS ---
 tab_res, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
 
-# --- ABA 1: RESULTADOS (DIÁRIO) ---
+# --- ABA 1: RESULTADOS ---
 with tab_res:
-    # Pega o último faturamento bruto salvo no histórico para exibir nos resultados
+    # Busca o último lançamento para os resultados em tempo real
     if not st.session_state.historico.empty:
-        ultimo = st.session_state.historico.iloc[-1]
-        res_b, res_l, res_c, res_k, res_h = ultimo["Bruto"], ultimo["Líquido"], ultimo["Bruto"]-ultimo["Líquido"], ultimo["KM"], ultimo["Horas"]
+        u = st.session_state.historico.iloc[-1]
+        rb, rl, rc, rk, rh = u["Bruto"], u["Líquido"], (u["Bruto"] - u["Líquido"]), u["KM"], u["Horas"]
     else:
-        res_b, res_l, res_c, res_k, res_h = 0.0, 0.0, 0.0, 0.0, 0.0
+        rb, rl, rc, rk, rh = 0.0, 0.0, 0.0, 0.0, 0.0
 
-    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento Dia</div><div class='big-val'>R$ {res_b:.2f}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento Dia</div><div class='big-val'>R$ {rb:.2f}</div></div>", unsafe_allow_html=True)
     c_sub1, c_sub2 = st.columns(2)
-    with c_sub1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {res_c:.2f}</div></div>", unsafe_allow_html=True)
-    with c_sub2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {res_l:.2f}</div></div>", unsafe_allow_html=True)
+    with c_sub1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {rc:.2f}</div></div>", unsafe_allow_html=True)
+    with c_sub2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {rl:.2f}</div></div>", unsafe_allow_html=True)
     
     st.write("")
-    # --- GRADE DE QUADRADOS (2 COLUNAS X 3 LINHAS) ---
-    # Linha 1 da Grade
+    # Grade em 2 colunas x 3 linhas
     g1, g2 = st.columns(2)
-    with g1: 
-        st.markdown(f"<div class='grid-item'><div class='grid-label'>Viagens</div><div class='grid-value'>{max(0, round(res_b / 35)) if res_b > 0 else 0}</div></div>", unsafe_allow_html=True)
-    with g2: 
-        st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(res_b/res_k if res_k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Viagens</div><div class='grid-value'>{max(0, round(rb/35)) if rb > 0 else 0}</div></div>", unsafe_allow_html=True)
+    with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(rb/rk if rk > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
-    # Linha 2 da Grade
     g3, g4 = st.columns(2)
     with g3: 
-        hr_int, min_int = int(res_h), int((res_h - int(res_h)) * 60)
-        st.markdown(f"<div class='grid-item'><div class='grid-label'>Tempo</div><div class='grid-value'>{hr_int:02d}:{min_int:02d}</div></div>", unsafe_allow_html=True)
-    with g4: 
-        st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(res_l/res_h if res_h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+        hi, mi = int(rh), int((rh - int(rh)) * 60)
+        st.markdown(f"<div class='grid-item'><div class='grid-label'>Tempo</div><div class='grid-value'>{hi:02d}:{mi:02d}</div></div>", unsafe_allow_html=True)
+    with g4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(rl/rh if rh > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
-    # Linha 3 da Grade
     g5, g6 = st.columns(2)
-    with g5: 
-        st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{res_k}</div></div>", unsafe_allow_html=True)
-    with g6: 
-        st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(res_l/res_k if res_k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{rk}</div></div>", unsafe_allow_html=True)
+    with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(rl/rk if rk > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
-    # --- BARRA DE PROGRESSO COM VALORES REAIS (ATUALIZADA) ---
     if total_casa > 0:
-        st.write("")
-        st.divider()
-        # Calcula o progresso com base no líquido do dia
-        prog = min(max(0.0, res_l / total_casa), 1.0)
+        prog = min(max(0.0, rl / total_casa), 1.0)
+        restante = total_casa - rl
+        meta_d = restante / 20 # Cálculo sugerido de 20 dias
         
-        # Calcula o restante da dívida e a meta diária (considerando 20 dias úteis)
-        restante_divida = total_casa - res_l
-        if restante_divida < 0: restante_divida = 0 # Evita valor negativo se faturar mais que a divida
-        meta_diaria = restante_divida / 20
-
-        st.write(f"🏠 *Visão de Abate das Contas Mensais:* {prog*100:.1f}%")
+        st.write(f"🏠 *Abate das Contas da Casa:* {prog*100:.1f}%")
         st.progress(prog)
-        
-        # Exibe os valores reais pedidos
-        st.info(f"*Restante da dívida do mês:* R$ {restante_divida:.2f}")
-        st.info(f"*Meta diária p/ bater contas (20 dias):* R$ {meta_diaria:.2f}")
+        # Resultados reais solicitados
+        st.write(f"📉 *Restante da dívida do mês:* R$ {max(0.0, restante):.2f}")
+        st.write(f"🎯 *Meta diária para bater a meta:* R$ {max(0.0, meta_d):.2f}")
 
-# --- ABA 2: LANÇAR GANHO DIÁRIO ---
+# --- ABA 2: LANÇAR ---
 with tab_lan:
     st.subheader("Lançar Dia")
-    # value=None deixa o campo vazio para digitação imediata
-    bruto_input = st.number_input("Ganho Bruto", value=None, placeholder=" ")
-    km_input = st.number_input("KM Total", value=None, placeholder=" ")
-    horas_input = st.number_input("Tempo Total (ex: 8.5)", value=None, placeholder=" ")
-    comb_input = st.number_input("Gasto Combustível", value=None, placeholder=" ")
+    b_in = st.number_input("Ganho Bruto", value=None, placeholder=" ")
+    k_in = st.number_input("KM Total", value=None, placeholder=" ")
+    h_in = st.number_input("Horas", value=None, placeholder=" ")
+    c_in = st.number_input("Combustível", value=None, placeholder=" ")
     
-    if st.button("💾 SALVAR GANHO DIÁRIO", use_container_width=True):
-        if bruto_input is not None:
-            # Pega o histórico para cálculo técnico seguro
+    if st.button("💾 SALVAR DIA", use_container_width=True):
+        if b_in is not None:
+            # Cálculos internos
+            l_calc = b_in - (c_in or 0.0)
+            k_calc = k_in or 1.0
+            h_calc = h_in or 1.0
+            
             novo = {
                 "Data": datetime.now().strftime("%d/%m/%Y"), 
-                "Bruto": bruto_input, 
-                "Líquido": bruto_input - (comb_input if comb_input else 0.0), 
-                "KM": km_input if km_input and km_input > 0 else 1.0, 
-                "Horas": horas_input if horas_input and horas_input > 0 else 1.0
+                "Bruto": b_in, "Líquido": l_calc, 
+                "KM": k_calc, "Horas": h_calc, 
+                "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc
             }
-            # Adiciona os cálculos de KM_Liq e Hora_Liq que são usados no histórico
-            novo["KM_Liq"] = novo["Líquido"] / novo["KM"]
-            novo["Hora_Liq"] = novo["Líquido"] / novo["Horas"]
-            
             st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo])], ignore_index=True)
-            st.success("Dados salvos! Confira na aba Resultados.")
-            st.rerun() # Atualiza para os resultados aparecerem
-        else:
-            st.warning("Preencha o Ganho Bruto.")
+            st.success("Salvo!")
+            st.rerun()
 
 # --- ABA 3: HISTÓRICO ---
 with tab_hist:
     if not st.session_state.historico.empty:
         st.dataframe(st.session_state.historico, use_container_width=True)
-        if st.button("Zerar Histórico"):
-            st.session_state.historico = pd.DataFrame(columns=st.session_state.historico.columns)
-            st.rerun()
     else:
         st.info("Sem dados no histórico.")
 
@@ -185,15 +164,13 @@ with tab_contas:
     col1, col2 = st.columns(2)
     with col1:
         st.session_state.contas["Aluguel"] = st.number_input("Aluguel", value=st.session_state.contas["Aluguel"], placeholder=" ")
-        st.session_state.contas["Luz"] = st.number_input("Conta luz", value=st.session_state.contas["Luz"], placeholder=" ")
-        st.session_state.contas["Água"] = st.number_input("Água", value=st.session_state.contas["Água"], placeholder=" ")
+        st.session_state.contas["Luz"] = st.number_input("Conta de Luz", value=st.session_state.contas["Luz"], placeholder=" ")
+        st.session_state.contas["Água"] = st.number_input("Conta de Água", value=st.session_state.contas["Água"], placeholder=" ")
         st.session_state.contas["Internet"] = st.number_input("Internet", value=st.session_state.contas["Internet"], placeholder=" ")
     with col2:
-        st.session_state.contas["Cartões"] = st.number_input("Cartões", value=st.session_state.contas["Cartões"], placeholder=" ")
+        st.session_state.contas["Cartões"] = st.number_input("Cartões de Crédito", value=st.session_state.contas["Cartões"], placeholder=" ")
         st.session_state.contas["Financiamentos"] = st.number_input("Financiamentos", value=st.session_state.contas["Financiamentos"], placeholder=" ")
-        st.session_state.contas["Outras"] = st.number_input("Outras contas", value=st.session_state.contas["Outras"], placeholder=" ")
+        st.session_state.contas["Outras"] = st.number_input("Outras Contas", value=st.session_state.contas["Outras"], placeholder=" ")
     
     st.divider()
-    # Recalcula o total das contas com base nos novos inputs
-    total_casa_lan = sum(v if v is not None else 0.0 for v in st.session_state.contas.values())
-    st.metric("TOTAL MENSAL", f"R$ {total_casa_lan:.2f}")
+    st.metric("TOTAL DE DESPESAS", f"R$ {total_casa:.2f}")
