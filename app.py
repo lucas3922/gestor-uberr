@@ -22,7 +22,7 @@ st.markdown("""
     /* Cor das letras para branco em todo o app */
     label, p, span, h1, h2, h3, .stMarkdown { color: #ffffff !important; }
 
-    /* Forçar colunas lado a lado no celular - Ajustado para 2 colunas */
+    /* Forçar colunas lado a lado no celular - 2 colunas */
     [data-testid="column"] {
         width: 50% !important;
         flex: 1 1 45% !important;
@@ -78,53 +78,49 @@ if 'contas' not in st.session_state:
         "Cartões": None, "Financiamentos": None, "Outras": None
     }
 
-# --- CÁLCULOS TÉCNICOS ---
-# Soma ignorando campos vazios (None)
+# Soma ignorando campos vazios
 total_casa = sum(v for v in st.session_state.contas.values() if v is not None)
 
-# --- ABAS ---
 tab_res, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
 
-# --- ABA 1: RESULTADOS ---
-with tab_res:
-    # Busca o último lançamento para os resultados em tempo real
-    if not st.session_state.historico.empty:
-        u = st.session_state.historico.iloc[-1]
-        rb, rl, rc, rk, rh = u["Bruto"], u["Líquido"], (u["Bruto"] - u["Líquido"]), u["KM"], u["Horas"]
-    else:
-        rb, rl, rc, rk, rh = 0.0, 0.0, 0.0, 0.0, 0.0
-
-    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento Dia</div><div class='big-val'>R$ {rb:.2f}</div></div>", unsafe_allow_html=True)
+# --- FUNÇÃO PARA RENDERIZAR GRADE (PADRÃO IGUAL PÁGINA 1) ---
+def renderizar_grade(b, l, k, h, total_meta):
+    c = b - l
+    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
     c_sub1, c_sub2 = st.columns(2)
-    with c_sub1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {rc:.2f}</div></div>", unsafe_allow_html=True)
-    with c_sub2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {rl:.2f}</div></div>", unsafe_allow_html=True)
+    with c_sub1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {c:.2f}</div></div>", unsafe_allow_html=True)
+    with c_sub2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {l:.2f}</div></div>", unsafe_allow_html=True)
     
     st.write("")
-    # Grade em 2 colunas x 3 linhas
     g1, g2 = st.columns(2)
-    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Viagens</div><div class='grid-value'>{max(0, round(rb/35)) if rb > 0 else 0}</div></div>", unsafe_allow_html=True)
-    with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(rb/rk if rk > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Viagens</div><div class='grid-value'>{max(0, round(b/35)) if b > 0 else 0}</div></div>", unsafe_allow_html=True)
+    with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(b/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
     g3, g4 = st.columns(2)
     with g3: 
-        hi, mi = int(rh), int((rh - int(rh)) * 60)
+        hi, mi = int(h), int((h - int(h)) * 60)
         st.markdown(f"<div class='grid-item'><div class='grid-label'>Tempo</div><div class='grid-value'>{hi:02d}:{mi:02d}</div></div>", unsafe_allow_html=True)
-    with g4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(rl/rh if rh > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    with g4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(l/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
     g5, g6 = st.columns(2)
-    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{rk}</div></div>", unsafe_allow_html=True)
-    with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(rl/rk if rk > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{k}</div></div>", unsafe_allow_html=True)
+    with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(l/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
-    if total_casa > 0:
-        prog = min(max(0.0, rl / total_casa), 1.0)
-        restante = total_casa - rl
-        meta_d = restante / 20 # Cálculo sugerido de 20 dias
-        
+    if total_meta > 0:
+        prog = min(max(0.0, l / total_meta), 1.0)
+        restante = total_meta - l
         st.write(f"🏠 *Abate das Contas da Casa:* {prog*100:.1f}%")
         st.progress(prog)
-        # Resultados reais solicitados
         st.write(f"📉 *Restante da dívida do mês:* R$ {max(0.0, restante):.2f}")
-        st.write(f"🎯 *Meta diária para bater a meta:* R$ {max(0.0, meta_d):.2f}")
+        st.write(f"🎯 *Meta diária para bater a meta:* R$ {max(0.0, restante/20):.2f}")
+
+# --- ABA 1: RESULTADOS ---
+with tab_res:
+    if not st.session_state.historico.empty:
+        u = st.session_state.historico.iloc[-1]
+        renderizar_grade(u["Bruto"], u["Líquido"], u["KM"], u["Horas"], total_casa)
+    else:
+        renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa)
 
 # --- ABA 2: LANÇAR ---
 with tab_lan:
@@ -136,38 +132,44 @@ with tab_lan:
     
     if st.button("💾 SALVAR DIA", use_container_width=True):
         if b_in is not None:
-            # Cálculos internos
             l_calc = b_in - (c_in or 0.0)
             k_calc = k_in or 1.0
             h_calc = h_in or 1.0
-            
-            novo = {
-                "Data": datetime.now().strftime("%d/%m/%Y"), 
-                "Bruto": b_in, "Líquido": l_calc, 
-                "KM": k_calc, "Horas": h_calc, 
-                "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc
-            }
+            novo = {"Data": datetime.now().strftime("%d/%m/%Y"), "Bruto": b_in, "Líquido": l_calc, "KM": k_calc, "Horas": h_calc, "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc}
             st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo])], ignore_index=True)
             st.success("Salvo!")
             st.rerun()
 
-# --- ABA 3: HISTÓRICO ---
+# --- ABA 3: HISTÓRICO (AGORA IGUAL À PÁGINA 1) ---
 with tab_hist:
     if not st.session_state.historico.empty:
-        st.dataframe(st.session_state.historico, use_container_width=True)
+        df_h = st.session_state.historico.copy()
+        # Filtro rápido
+        periodo = st.radio("Ver acumulado de:", ["Semana", "Mês", "Ano"], horizontal=True)
+        
+        b_total = df_h["Bruto"].sum()
+        l_total = df_h["Líquido"].sum()
+        k_total = df_h["KM"].sum()
+        h_total = df_h["Horas"].sum()
+        
+        # Usa a mesma função visual da Página 1
+        renderizar_grade(b_total, l_total, k_total, h_total, total_casa)
+        
+        st.divider()
+        st.dataframe(df_h, use_container_width=True)
     else:
         st.info("Sem dados no histórico.")
 
 # --- ABA 4: CONTAS DA CASA ---
 with tab_contas:
     st.subheader("🏠 Gestão Financeira da Casa")
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         st.session_state.contas["Aluguel"] = st.number_input("Aluguel", value=st.session_state.contas["Aluguel"], placeholder=" ")
         st.session_state.contas["Luz"] = st.number_input("Conta de Luz", value=st.session_state.contas["Luz"], placeholder=" ")
         st.session_state.contas["Água"] = st.number_input("Conta de Água", value=st.session_state.contas["Água"], placeholder=" ")
         st.session_state.contas["Internet"] = st.number_input("Internet", value=st.session_state.contas["Internet"], placeholder=" ")
-    with col2:
+    with c2:
         st.session_state.contas["Cartões"] = st.number_input("Cartões de Crédito", value=st.session_state.contas["Cartões"], placeholder=" ")
         st.session_state.contas["Financiamentos"] = st.number_input("Financiamentos", value=st.session_state.contas["Financiamentos"], placeholder=" ")
         st.session_state.contas["Outras"] = st.number_input("Outras Contas", value=st.session_state.contas["Outras"], placeholder=" ")
