@@ -69,7 +69,7 @@ st.markdown("""
 if 'historico' not in st.session_state:
     st.session_state.historico = pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas", "KM_Liq", "Hora_Liq"])
 
-# Dicionário de contas atualizado conforme seu pedido
+# Dicionário de contas com nomes simplificados para evitar erros de chave
 if 'contas' not in st.session_state:
     st.session_state.contas = {
         "Aluguel": 0.0, 
@@ -184,10 +184,9 @@ with tab_hist:
     else:
         st.info("Sem dados no histórico.")
 
-# --- ABA 4: CONTAS (ATUALIZADA) ---
+# --- ABA 4: CONTAS DA CASA ---
 with tab_contas:
-    st.subheader("🏠 Contas da Casa")
-    st.write("Insira os valores das suas despesas mensais:")
+    st.subheader("🏠 Gestão Financeira da Casa")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -196,10 +195,10 @@ with tab_contas:
         st.session_state.contas["Água"] = st.number_input("Conta de Água", value=st.session_state.contas["Água"])
         st.session_state.contas["Internet"] = st.number_input("Internet", value=st.session_state.contas["Internet"])
     with col2:
+        # Note que aqui usamos a chave exata "Cartões"
         st.session_state.contas["Cartões"] = st.number_input("Cartões de Crédito", value=st.session_state.contas["Cartões"])
         st.session_state.contas["Financiamentos"] = st.number_input("Financiamentos", value=st.session_state.contas["Financiamentos"])
         st.session_state.contas["Outras"] = st.number_input("Outras Contas", value=st.session_state.contas["Outras"])
     
     st.divider()
-    st.metric("TOTAL MENSAL", f"R$ {total_casa:.2f}")
-    st.info("Este valor total é utilizado na barra de progresso da aba Resultados.")
+    st.metric("TOTAL DE DESPESAS", f"R$ {total_casa:.2f}")
