@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import calendar
 
 # Configuração de App Mobile
@@ -74,25 +74,24 @@ if 'contas' not in st.session_state:
     }
 
 # Cálculo de dias restantes no mês
-hoje = date.today()
-ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
-dias_restantes = (ultimo_dia - hoje.day) + 1
+hoje_dt = date.today()
+ultimo_dia = calendar.monthrange(hoje_dt.year, hoje_dt.month)[1]
+dias_restantes = (ultimo_dia - hoje_dt.day) + 1
 
 total_casa = sum(v for v in st.session_state.contas.values() if v is not None)
 
 tab_res, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
 
-# --- FUNÇÃO VISUAL (AGORA COM HORA BRUTA NO LUGAR DE VIAGENS) ---
-def renderizar_grade(b, l, k, h, total_meta, dias_f):
+# --- FUNÇÃO VISUAL PADRÃO ---
+def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     c = b - l
-    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento {titulo_aba}</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
     c_sub1, c_sub2 = st.columns(2)
     with c_sub1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {c:.2f}</div></div>", unsafe_allow_html=True)
     with c_sub2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {l:.2f}</div></div>", unsafe_allow_html=True)
     
     st.write("")
     g1, g2 = st.columns(2)
-    # TROCADO: Viagens -> Hora Bruta
     with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Hora Bruta</div><div class='grid-value'>R$ {(b/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
     with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(b/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
@@ -110,7 +109,6 @@ def renderizar_grade(b, l, k, h, total_meta, dias_f):
         prog = min(max(0.0, l / total_meta), 1.0)
         restante = total_meta - l
         meta_real = restante / dias_f if dias_f > 0 else restante
-        
         st.write(f"🏠 *Abate das Contas da Casa:* {prog*100:.1f}%")
         st.progress(prog)
         st.write(f"📉 *Falta para quitar o mês:* R$ {max(0.0, restante):.2f}")
@@ -120,9 +118,9 @@ def renderizar_grade(b, l, k, h, total_meta, dias_f):
 with tab_res:
     if not st.session_state.historico.empty:
         u = st.session_state.historico.iloc[-1]
-        renderizar_grade(u["Bruto"], u["Líquido"], u["KM"], u["Horas"], total_casa, dias_restantes)
+        renderizar_grade(u["Bruto"], u["Líquido"], u["KM"], u["Horas"], total_casa, dias_restantes, "Dia")
     else:
-        renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa, dias_restantes)
+        renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa, dias_restantes, "Dia")
 
 with tab_lan:
     st.subheader("Lançar Dia")
@@ -144,9 +142,25 @@ with tab_lan:
 with tab_hist:
     if not st.session_state.historico.empty:
         df_h = st.session_state.historico.copy()
-        renderizar_grade(df_h["Bruto"].sum(), df_h["Líquido"].sum(), df_h["KM"].sum(), df_h["Horas"].sum(), total_casa, dias_restantes)
+        df_h['Data_dt'] = pd.to_datetime(df_h['Data'], format='%d/%m/%Y')
+        hoje = datetime.now()
+
+        periodo = st.radio("Período:", ["Semana", "Mês", "Ano"], horizontal=True)
+
+        if periodo == "Semana":
+            mask = df_h['Data_dt'] > (hoje - timedelta(days=7))
+        elif periodo == "Mês":
+            mask = df_h['Data_dt'].dt.month == hoje.month
+        else:
+            mask = df_h['Data_dt'].dt.year == hoje.year
+
+        df_p = df_h[mask]
+        
+        if not df_p.empty:
+            renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
+        
         st.divider()
-        st.dataframe(df_h, use_container_width=True)
+        st.dataframe(df_h.drop(columns=['Data_dt']), use_container_width=True)
     else:
         st.info("Sem dados no histórico.")
 
