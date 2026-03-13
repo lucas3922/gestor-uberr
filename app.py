@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta
 import calendar
 import os
 
+# Configuração de App Mobile
 st.set_page_config(
     page_title="UberPro", 
     layout="wide", 
@@ -11,6 +12,7 @@ st.set_page_config(
     page_icon="🚗"
 )
 
+# --- CSS PARA INTERFACE DE APP DARK MODE ---
 st.markdown("""
 <style>
     .stApp { background-color: #000000; color: #ffffff; }
@@ -66,7 +68,9 @@ ultimo_dia = calendar.monthrange(hoje_ref.year, hoje_ref.month)[1]
 dias_restantes = max(1, (ultimo_dia - hoje_ref.day) + 1)
 total_casa = sum(float(v) for v in st.session_state.contas.values() if v is not None)
 
-tab_res, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
+tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(
+["📊 RESULTADOS","🚦 TURNO","➕ LANÇAR","📅 HISTÓRICO","🏠 CONTAS"]
+)
 
 def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     c = b - l
@@ -90,15 +94,23 @@ def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{k:.1f}</div></div>", unsafe_allow_html=True)
     with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(l/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
-with tab_res:
+    if total_meta > 0:
+        prog = min(max(0.0, l / total_meta), 1.0)
+        restante = total_meta - l
+        meta_real = restante / dias_f if dias_f > 0 else restante
+        st.write(f"🏠 *Abate das Contas da Casa:* {prog*100:.1f}%")
+        st.progress(prog)
+        st.write(f"📉 *Falta para quitar o mês:* R$ {max(0.0, restante):.2f}")
+        st.write(f"🎯 *Meta diária p/ os {dias_f} dias restantes:* R$ {max(0.0, meta_real):.2f}")
 
+with tab_res:
     if not st.session_state.historico.empty:
         u = st.session_state.historico.iloc[-1]
         renderizar_grade(float(u["Bruto"]), float(u["Líquido"]), float(u["KM"]), float(u["Horas"]), total_casa, dias_restantes, "Dia")
     else:
         renderizar_grade(0.0,0.0,1.0,1.0,total_casa,dias_restantes,"Dia")
 
-    st.divider()
+with tab_turno:
 
     st.subheader("🚦 Modo Turno Inteligente")
 
@@ -173,9 +185,7 @@ with tab_lan:
     c_in = st.number_input("Combustível", value=0.0)
 
     if st.button("💾 SALVAR DIA", use_container_width=True):
-
         if b_in > 0:
-
             l_calc = b_in - c_in
             k_calc = k_in if k_in > 0 else 1.0
             h_calc = h_in if h_in > 0 else 1.0
@@ -197,12 +207,9 @@ with tab_lan:
             st.rerun()
 
 with tab_hist:
-
     if not st.session_state.historico.empty:
-
         df_h = st.session_state.historico.copy()
         df_h['Data_dt'] = pd.to_datetime(df_h['Data'], format='%d/%m/%Y')
-
         hoje_agora = datetime.now()
 
         periodo = st.radio("Período:", ["Semana","Mês","Ano"], horizontal=True)
@@ -220,32 +227,25 @@ with tab_hist:
             renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
 
         st.divider()
-
         st.dataframe(df_h.sort_values(by='Data_dt', ascending=False).drop(columns=['Data_dt']), use_container_width=True)
 
     else:
         st.info("Sem dados no histórico.")
 
 with tab_contas:
-
     st.subheader("🏠 Contas da Casa")
 
     c1, c2 = st.columns(2)
-
     campos = ["Aluguel","Luz","Água","Internet","Cartões","Financiamentos","Outras"]
 
     for i,campo in enumerate(campos):
-
         col = c1 if i < 4 else c2
         st.session_state.contas[campo] = col.number_input(campo,value=float(st.session_state.contas.get(campo,0)))
 
     if st.button("💾 SALVAR CONTAS"):
-
         pd.DataFrame([st.session_state.contas]).to_csv(FILE_CONTAS,index=False)
-
         st.success("Contas salvas!")
         st.rerun()
 
     st.divider()
-
     st.metric("TOTAL MENSAL",f"R$ {total_casa:.2f}")
