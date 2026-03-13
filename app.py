@@ -33,12 +33,13 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { background-color: #1C1C1E; border-radius: 8px; color: #ffffff !important; padding: 0 10px; }
     .stTabs [aria-selected="true"] { background-color: #FF4500 !important; color: white !important; }
 
-    /* LINHA ADICIONADA PARA TEXTO DOS BOTÕES FICAR VERMELHO */
+    /* TEXTO DOS BOTÕES EM VERMELHO */
     div.stButton > button p { color: red !important; }
 
 </style>
 """, unsafe_allow_html=True)
 
+# --- PERSISTÊNCIA CORRIGIDA ---
 FILE_HIST = "dados_uber.csv"
 FILE_CONTAS = "contas_uber.csv"
 
@@ -67,14 +68,26 @@ if 'historico' not in st.session_state:
 if 'contas' not in st.session_state:
     st.session_state.contas = carregar_contas()
 
+# --- ESTADO DO TURNO ---
+if "turno_ativo" not in st.session_state:
+    st.session_state.turno_ativo = False
+
+if "inicio_turno" not in st.session_state:
+    st.session_state.inicio_turno = None
+
+if "ganho_turno" not in st.session_state:
+    st.session_state.ganho_turno = 0.0
+
+if "km_turno" not in st.session_state:
+    st.session_state.km_turno = 0.0
+
+# Lógica de datas
 hoje_ref = date.today()
 ultimo_dia = calendar.monthrange(hoje_ref.year, hoje_ref.month)[1]
 dias_restantes = max(1, (ultimo_dia - hoje_ref.day) + 1)
 total_casa = sum(float(v) for v in st.session_state.contas.values() if v is not None)
 
-tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(
-["📊 RESULTADOS","🚦 TURNO","➕ LANÇAR","📅 HISTÓRICO","🏠 CONTAS"]
-)
+tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "🚦 TURNO", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
 
 def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     c = b - l
@@ -88,36 +101,24 @@ with tab_res:
         u = st.session_state.historico.iloc[-1]
         renderizar_grade(float(u["Bruto"]), float(u["Líquido"]), float(u["KM"]), float(u["Horas"]), total_casa, dias_restantes, "Dia")
     else:
-        renderizar_grade(0.0,0.0,1.0,1.0,total_casa,dias_restantes,"Dia")
+        renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa, dias_restantes, "Dia")
 
 with tab_turno:
 
     st.subheader("🚦 Modo Turno Inteligente")
 
-    if "turno_ativo" not in st.session_state:
-        st.session_state.turno_ativo = False
+    c1, c2 = st.columns(2)
 
-    if "inicio_turno" not in st.session_state:
-        st.session_state.inicio_turno = None
-
-    if "ganho_turno" not in st.session_state:
-        st.session_state.ganho_turno = 0.0
-
-    if "km_turno" not in st.session_state:
-        st.session_state.km_turno = 0.0
-
-    col1, col2 = st.columns(2)
-
-    with col1:
+    with c1:
         if not st.session_state.turno_ativo:
             if st.button("▶ INICIAR TURNO", use_container_width=True):
                 st.session_state.turno_ativo = True
                 st.session_state.inicio_turno = datetime.now()
-                st.session_state.ganho_turno = 0.0
-                st.session_state.km_turno = 0.0
+                st.session_state.ganho_turno = 0
+                st.session_state.km_turno = 0
                 st.rerun()
 
-    with col2:
+    with c2:
         if st.session_state.turno_ativo:
             if st.button("⏹ ENCERRAR TURNO", use_container_width=True):
 
@@ -129,17 +130,14 @@ with tab_turno:
 
                 if ganho > 0:
 
-                    k_calc = km if km > 0 else 1.0
-                    h_calc = horas if horas > 0 else 1.0
-
                     novo = {
                         "Data": date.today().strftime("%d/%m/%Y"),
                         "Bruto": ganho,
                         "Líquido": ganho,
-                        "KM": k_calc,
-                        "Horas": h_calc,
-                        "KM_Liq": ganho/k_calc,
-                        "Hora_Liq": ganho/h_calc
+                        "KM": km if km > 0 else 1,
+                        "Horas": horas if horas > 0 else 1,
+                        "KM_Liq": ganho/km if km > 0 else 0,
+                        "Hora_Liq": ganho/horas if horas > 0 else 0
                     }
 
                     st.session_state.historico = pd.concat(
@@ -152,3 +150,23 @@ with tab_turno:
                 st.session_state.turno_ativo = False
                 st.success("Turno salvo no histórico!")
                 st.rerun()
+
+    if st.session_state.turno_ativo:
+
+        tempo = datetime.now() - st.session_state.inicio_turno
+        horas = tempo.total_seconds() / 3600
+
+        g1, g2 = st.columns(2)
+
+        ganho = g1.number_input("💰 Ganho no turno", value=st.session_state.ganho_turno)
+        km = g2.number_input("🚗 KM no turno", value=st.session_state.km_turno)
+
+        st.session_state.ganho_turno = ganho
+        st.session_state.km_turno = km
+
+        hi = int(horas)
+        mi = int((horas - hi) * 60)
+
+        st.write(f"⏱ Tempo: {hi:02d}:{mi:02d}")
+        st.write(f"💵 R$/hora: {ganho/horas if horas>0 else 0:.2f}")
+        st.write(f"💵 R$/km: {ganho/km if km>0 else 0:.2f}")
