@@ -33,8 +33,8 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { background-color: #1C1C1E; border-radius: 8px; color: #ffffff !important; padding: 0 10px; }
     .stTabs [aria-selected="true"] { background-color: #FF4500 !important; color: white !important; }
 
-    /* ALTERAÇÃO PEDIDA: texto dos botões em vermelho */
-    button[kind="secondary"] p { color: red !important; }
+    /* LINHA ADICIONADA PARA TEXTO DOS BOTÕES FICAR VERMELHO */
+    div.stButton > button p { color: red !important; }
 
 </style>
 """, unsafe_allow_html=True)
@@ -82,11 +82,6 @@ def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     c_sub1, c_sub2 = st.columns(2)
     with c_sub1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {c:.2f}</div></div>", unsafe_allow_html=True)
     with c_sub2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {l:.2f}</div></div>", unsafe_allow_html=True)
-
-    st.write("")
-    g1, g2 = st.columns(2)
-    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Hora Bruta</div><div class='grid-value'>R$ {(b/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-    with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(b/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
 with tab_res:
     if not st.session_state.historico.empty:
