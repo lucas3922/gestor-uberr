@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
+import calendar
 
 # Configuração de App Mobile
 st.set_page_config(
@@ -15,21 +16,17 @@ st.markdown("""
 <style>
     .stApp { background-color: #000000; color: #ffffff; }
     .block-container { padding-top: 0.5rem; padding-bottom: 2rem; }
-    
     header {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Cor das letras para branco em todo o app */
     label, p, span, h1, h2, h3, .stMarkdown { color: #ffffff !important; }
 
-    /* Forçar colunas lado a lado no celular - 2 colunas */
     [data-testid="column"] {
         width: 50% !important;
         flex: 1 1 45% !important;
         min-width: 45% !important;
     }
 
-    /* Cartões Coloridos */
     .card-faturamento { background-color: #00FF00; color: black !important; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 10px; width: 100% !important; }
     .card-despesa { background-color: #FF0000; color: white !important; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
     .card-saldo { background-color: #800080; color: white !important; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
@@ -37,7 +34,6 @@ st.markdown("""
     .big-val { font-size: 20px; font-weight: bold; }
     .label-card { font-size: 10px; font-weight: 600; text-transform: uppercase; }
 
-    /* Grade de métricas em quadrados */
     .grid-item {
         background-color: #1C1C1E;
         border-radius: 12px;
@@ -53,7 +49,6 @@ st.markdown("""
     .grid-label { color: #ffffff !important; font-size: 9px; font-weight: bold; text-transform: uppercase; opacity: 0.8; }
     .grid-value { color: #FFFFFF !important; font-size: 14px; font-weight: bold; }
 
-    /* Estilo das Tabs */
     .stTabs [data-baseweb="tab-list"] { gap: 5px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #1C1C1E;
@@ -78,13 +73,17 @@ if 'contas' not in st.session_state:
         "Cartões": None, "Financiamentos": None, "Outras": None
     }
 
-# Soma ignorando campos vazios
+# Cálculo de dias restantes no mês
+hoje = date.today()
+ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
+dias_restantes = (ultimo_dia - hoje.day) + 1
+
 total_casa = sum(v for v in st.session_state.contas.values() if v is not None)
 
 tab_res, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
 
-# --- FUNÇÃO PARA RENDERIZAR GRADE (PADRÃO IGUAL PÁGINA 1) ---
-def renderizar_grade(b, l, k, h, total_meta):
+# --- FUNÇÃO VISUAL (AGORA COM HORA BRUTA NO LUGAR DE VIAGENS) ---
+def renderizar_grade(b, l, k, h, total_meta, dias_f):
     c = b - l
     st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
     c_sub1, c_sub2 = st.columns(2)
@@ -93,7 +92,8 @@ def renderizar_grade(b, l, k, h, total_meta):
     
     st.write("")
     g1, g2 = st.columns(2)
-    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Viagens</div><div class='grid-value'>{max(0, round(b/35)) if b > 0 else 0}</div></div>", unsafe_allow_html=True)
+    # TROCADO: Viagens -> Hora Bruta
+    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Hora Bruta</div><div class='grid-value'>R$ {(b/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
     with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(b/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
     g3, g4 = st.columns(2)
@@ -109,20 +109,21 @@ def renderizar_grade(b, l, k, h, total_meta):
     if total_meta > 0:
         prog = min(max(0.0, l / total_meta), 1.0)
         restante = total_meta - l
+        meta_real = restante / dias_f if dias_f > 0 else restante
+        
         st.write(f"🏠 *Abate das Contas da Casa:* {prog*100:.1f}%")
         st.progress(prog)
-        st.write(f"📉 *Restante da dívida do mês:* R$ {max(0.0, restante):.2f}")
-        st.write(f"🎯 *Meta diária para bater a meta:* R$ {max(0.0, restante/20):.2f}")
+        st.write(f"📉 *Falta para quitar o mês:* R$ {max(0.0, restante):.2f}")
+        st.write(f"🎯 *Meta diária p/ os {dias_f} dias restantes:* R$ {max(0.0, meta_real):.2f}")
 
-# --- ABA 1: RESULTADOS ---
+# --- ABAS ---
 with tab_res:
     if not st.session_state.historico.empty:
         u = st.session_state.historico.iloc[-1]
-        renderizar_grade(u["Bruto"], u["Líquido"], u["KM"], u["Horas"], total_casa)
+        renderizar_grade(u["Bruto"], u["Líquido"], u["KM"], u["Horas"], total_casa, dias_restantes)
     else:
-        renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa)
+        renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa, dias_restantes)
 
-# --- ABA 2: LANÇAR ---
 with tab_lan:
     st.subheader("Lançar Dia")
     b_in = st.number_input("Ganho Bruto", value=None, placeholder=" ")
@@ -140,39 +141,26 @@ with tab_lan:
             st.success("Salvo!")
             st.rerun()
 
-# --- ABA 3: HISTÓRICO (AGORA IGUAL À PÁGINA 1) ---
 with tab_hist:
     if not st.session_state.historico.empty:
         df_h = st.session_state.historico.copy()
-        # Filtro rápido
-        periodo = st.radio("Ver acumulado de:", ["Semana", "Mês", "Ano"], horizontal=True)
-        
-        b_total = df_h["Bruto"].sum()
-        l_total = df_h["Líquido"].sum()
-        k_total = df_h["KM"].sum()
-        h_total = df_h["Horas"].sum()
-        
-        # Usa a mesma função visual da Página 1
-        renderizar_grade(b_total, l_total, k_total, h_total, total_casa)
-        
+        renderizar_grade(df_h["Bruto"].sum(), df_h["Líquido"].sum(), df_h["KM"].sum(), df_h["Horas"].sum(), total_casa, dias_restantes)
         st.divider()
         st.dataframe(df_h, use_container_width=True)
     else:
         st.info("Sem dados no histórico.")
 
-# --- ABA 4: CONTAS DA CASA ---
 with tab_contas:
-    st.subheader("🏠 Gestão Financeira da Casa")
+    st.subheader("🏠 Contas da Casa")
     c1, c2 = st.columns(2)
     with c1:
         st.session_state.contas["Aluguel"] = st.number_input("Aluguel", value=st.session_state.contas["Aluguel"], placeholder=" ")
-        st.session_state.contas["Luz"] = st.number_input("Conta de Luz", value=st.session_state.contas["Luz"], placeholder=" ")
-        st.session_state.contas["Água"] = st.number_input("Conta de Água", value=st.session_state.contas["Água"], placeholder=" ")
+        st.session_state.contas["Luz"] = st.number_input("Luz", value=st.session_state.contas["Luz"], placeholder=" ")
+        st.session_state.contas["Água"] = st.number_input("Água", value=st.session_state.contas["Água"], placeholder=" ")
         st.session_state.contas["Internet"] = st.number_input("Internet", value=st.session_state.contas["Internet"], placeholder=" ")
     with c2:
-        st.session_state.contas["Cartões"] = st.number_input("Cartões de Crédito", value=st.session_state.contas["Cartões"], placeholder=" ")
+        st.session_state.contas["Cartões"] = st.number_input("Cartões", value=st.session_state.contas["Cartões"], placeholder=" ")
         st.session_state.contas["Financiamentos"] = st.number_input("Financiamentos", value=st.session_state.contas["Financiamentos"], placeholder=" ")
-        st.session_state.contas["Outras"] = st.number_input("Outras Contas", value=st.session_state.contas["Outras"], placeholder=" ")
-    
+        st.session_state.contas["Outras"] = st.number_input("Outras", value=st.session_state.contas["Outras"], placeholder=" ")
     st.divider()
-    st.metric("TOTAL DE DESPESAS", f"R$ {total_casa:.2f}")
+    st.metric("TOTAL MENSAL", f"R$ {total_casa:.2f}")
