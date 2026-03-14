@@ -1,4 +1,4 @@
-import streamlit as st
+Import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
 import calendar
@@ -38,14 +38,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- PERSISTÊNCIA ---
-FILE_USERS = "usuarios_cadastrados.csv"
 FILE_HIST = "dados_uber.csv"
 FILE_CONTAS = "contas_uber.csv"
-
-def carregar_users():
-    if os.path.exists(FILE_USERS):
-        return pd.read_csv(FILE_USERS)
-    return pd.DataFrame(columns=["email", "senha", "telefone"])
 
 def carregar_dados_todos():
     if os.path.exists(FILE_HIST):
@@ -59,42 +53,23 @@ def carregar_contas_todas():
         except: pass
     return pd.DataFrame(columns=["Usuario", "Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"])
 
-# --- LOGIN PERSISTENTE COM EMAIL/SENHA ---
-if "u_mail" in st.query_params:
-    st.session_state.usuario = st.query_params["u_mail"]
+# --- SISTEMA DE LOGIN ---
+if 'usuario' not in st.session_state:
+    st.session_state.usuario = None
 
-if 'usuario' not in st.session_state or st.session_state.usuario is None:
-    st.markdown("<h2 style='text-align: center;'>🚗 UberPro Acesso</h2>", unsafe_allow_html=True)
-    tab_log, tab_reg = st.tabs(["🔐 LOGIN", "📝 CADASTRO"])
-    
-    with tab_log:
-        email_in = st.text_input("E-mail").strip().lower()
-        senha_in = st.text_input("Senha", type="password").strip()
-        if st.button("ACESSAR SISTEMA", use_container_width=True):
-            df_u = carregar_users()
-            user_check = df_u[(df_u['email'] == email_in) & (df_u['senha'] == senha_in)]
-            if not user_check.empty:
-                st.session_state.usuario = email_in
-                st.query_params["u_mail"] = email_in # Salva login no navegador
-                st.rerun()
-            else: st.error("E-mail ou Senha incorretos.")
-
-    with tab_reg:
-        n_email = st.text_input("Novo E-mail").strip().lower()
-        n_senha = st.text_input("Nova Senha", type="password").strip()
-        n_tel = st.text_input("Telefone")
-        if st.button("CRIAR CONTA", use_container_width=True):
-            df_u = carregar_users()
-            if n_email in df_u['email'].values: st.warning("E-mail já existe.")
-            elif n_email and n_senha:
-                novo_u = pd.DataFrame([{"email": n_email, "senha": n_senha, "telefone": n_tel}])
-                pd.concat([df_u, novo_u], ignore_index=True).to_csv(FILE_USERS, index=False)
-                st.success("Cadastrado! Use a aba Login.")
+if st.session_state.usuario is None:
+    st.markdown("<h2 style='text-align: center;'>🚗 UberPro Login</h2>", unsafe_allow_html=True)
+    user_input = st.text_input("Digite seu nome para acessar:", placeholder="Ex: Lucas").strip().lower()
+    if st.button("ENTRAR NO SISTEMA", use_container_width=True):
+        if user_input:
+            st.session_state.usuario = user_input
+            st.rerun()
     st.stop()
 
-# --- DADOS DO USUÁRIO ---
+# --- FILTRAGEM DE DADOS POR USUÁRIO ---
 df_todos_hist = carregar_dados_todos()
 df_user_hist = df_todos_hist[df_todos_hist['Usuario'] == st.session_state.usuario].copy()
+
 df_todas_contas = carregar_contas_todas()
 user_contas_df = df_todas_contas[df_todas_contas['Usuario'] == st.session_state.usuario]
 
@@ -103,14 +78,17 @@ if not user_contas_df.empty:
 else:
     st.session_state.contas = {"Usuario": st.session_state.usuario, "Aluguel": 0.0, "Luz": 0.0, "Água": 0.0, "Internet": 0.0, "Cartões": 0.0, "Financiamentos": 0.0, "Outras": 0.0}
 
+# Inicialização de Turno
 if 'turno_ativo' not in st.session_state: st.session_state.turno_ativo = False
 if 'inicio_turno' not in st.session_state: st.session_state.inicio_turno = None
 
+# Variáveis Globais de Cálculo
 hoje_ref = date.today()
 ultimo_dia = calendar.monthrange(hoje_ref.year, hoje_ref.month)[1]
 dias_restantes = max(1, (ultimo_dia - hoje_ref.day) + 1)
 total_casa = sum(float(v) for k, v in st.session_state.contas.items() if k != "Usuario" and v is not None)
 
+# --- FUNÇÃO DE RENDERIZAR GRADE ---
 def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     c = b - l
     st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento {titulo_aba}</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
@@ -133,10 +111,12 @@ def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     if total_meta > 0:
         prog = min(max(0.0, l / total_meta), 1.0)
         restante = total_meta - l
-        st.write(f"🏠 *Abate das Contas ({st.session_state.usuario}):* {prog*100:.1f}%")
+        meta_real = restante / dias_f if dias_f > 0 else restante
+        st.write(f"🏠 *Abate das Contas ({st.session_state.usuario.capitalize()}):* {prog*100:.1f}%")
         st.progress(prog)
         st.write(f"📉 *Falta para quitar:* R$ {max(0.0, restante):.2f}")
 
+# --- ABAS ---
 tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "⏱️ TURNO", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
 
 with tab_res:
@@ -146,7 +126,7 @@ with tab_res:
     else: renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa, dias_restantes, "Dia")
 
 with tab_turno:
-    st.subheader(f"Modo Turno: {st.session_state.usuario}")
+    st.subheader(f"Modo Turno: {st.session_state.usuario.capitalize()}")
     if not st.session_state.turno_ativo:
         if st.button("🚀 INICIAR TURNO", use_container_width=True, type="primary"):
             st.session_state.inicio_turno = datetime.now()
@@ -195,7 +175,10 @@ with tab_lan:
 with tab_hist:
     if not df_user_hist.empty:
         df_user_hist['Data_dt'] = pd.to_datetime(df_user_hist['Data'], format='%d/%m/%Y')
+        periodo = st.radio("Período:", ["Semana", "Mês", "Ano"], horizontal=True)
+        # Filtros simplificados para o usuário
         st.dataframe(df_user_hist.sort_values(by='Data_dt', ascending=False).drop(columns=['Data_dt', 'Usuario']), use_container_width=True)
+        
         with st.expander("🗑️ Apagar Registro"):
             opcoes = {f"{row['Data']} - R$ {row['Bruto']:.2f}": idx for idx, row in df_user_hist.iterrows()}
             selecionado = st.selectbox("Selecione:", options=list(opcoes.keys()))
@@ -206,7 +189,7 @@ with tab_hist:
     else: st.info("Sem dados para este usuário.")
 
 with tab_contas:
-    st.subheader(f"🏠 Contas de {st.session_state.usuario}")
+    st.subheader(f"🏠 Contas de {st.session_state.usuario.capitalize()}")
     c1, c2 = st.columns(2)
     campos = ["Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"]
     for i, campo in enumerate(campos):
@@ -221,7 +204,8 @@ with tab_contas:
         st.success("Salvo!")
         st.rerun()
     
-    if col_logout.button("🚪 SAIR / DESLOGAR", use_container_width=True):
+    if col_logout.button("🚪 SAIR / TROCAR USUÁRIO", use_container_width=True):
         st.session_state.usuario = None
-        st.query_params.clear() 
         st.rerun()
+
+
