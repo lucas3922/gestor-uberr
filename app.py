@@ -13,7 +13,7 @@ st.set_page_config(
     page_icon="🚗"
 )
 
-# --- CSS PARA INTERFACE DARK MODE ---
+# --- CSS PARA INTERFACE DE APP DARK MODE ---
 st.markdown("""
 <style>
     .stApp { background-color: #000000; color: #ffffff; }
@@ -37,189 +37,191 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- ARQUIVOS DE PERSISTÊNCIA ---
-FILE_USERS = "usuarios_pro.csv"
-FILE_HIST = "dados_uber_v2.csv"
-FILE_CONTAS = "contas_uber_v2.csv"
+# --- PERSISTÊNCIA ---
+FILE_USERS = "usuarios_cadastrados.csv"
+FILE_HIST = "dados_uber.csv"
+FILE_CONTAS = "contas_uber.csv"
 
-# --- FUNÇÕES DE CARREGAMENTO COM LIMPEZA DE DADOS ---
 def carregar_users():
     if os.path.exists(FILE_USERS):
-        df = pd.read_csv(FILE_USERS)
-        df['email'] = df['email'].astype(str).str.strip().str.lower()
-        df['senha'] = df['senha'].astype(str).str.strip()
-        return df
+        return pd.read_csv(FILE_USERS)
     return pd.DataFrame(columns=["email", "senha", "telefone"])
 
-def carregar_dados_v2():
+def carregar_dados_todos():
     if os.path.exists(FILE_HIST):
-        return pd.read_csv(FILE_HIST)
+        try: return pd.read_csv(FILE_HIST)
+        except: pass
     return pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas", "KM_Liq", "Hora_Liq", "Usuario"])
 
-def carregar_contas_v2():
+def carregar_contas_todas():
     if os.path.exists(FILE_CONTAS):
-        return pd.read_csv(FILE_CONTAS)
+        try: return pd.read_csv(FILE_CONTAS)
+        except: pass
     return pd.DataFrame(columns=["Usuario", "Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"])
 
-# --- CONTROLE DE SESSÃO ---
-if 'user_logado' not in st.session_state:
-    st.session_state.user_logado = None
+# --- LOGIN PERSISTENTE COM EMAIL/SENHA ---
+if "u_mail" in st.query_params:
+    st.session_state.usuario = st.query_params["u_mail"]
 
-# --- TELA DE ACESSO (LOGIN / CADASTRO) ---
-if st.session_state.user_logado is None:
-    st.markdown("<h2 style='text-align: center;'>🚗 UberPro System</h2>", unsafe_allow_html=True)
-    t_login, t_cadastro = st.tabs(["🔐 ACESSAR", "📝 CADASTRAR"])
-
-    with t_login:
-        email_login = st.text_input("E-mail", key="l_email").strip().lower()
-        senha_login = st.text_input("Senha", type="password", key="l_senha").strip()
-        if st.button("ENTRAR", use_container_width=True):
+if 'usuario' not in st.session_state or st.session_state.usuario is None:
+    st.markdown("<h2 style='text-align: center;'>🚗 UberPro Acesso</h2>", unsafe_allow_html=True)
+    tab_log, tab_reg = st.tabs(["🔐 LOGIN", "📝 CADASTRO"])
+    
+    with tab_log:
+        email_in = st.text_input("E-mail").strip().lower()
+        senha_in = st.text_input("Senha", type="password").strip()
+        if st.button("ACESSAR SISTEMA", use_container_width=True):
             df_u = carregar_users()
-            # Validação robusta
-            valid_user = df_u[(df_u['email'] == email_login) & (df_u['senha'] == senha_login)]
-            if not valid_user.empty:
-                st.session_state.user_logado = email_login
-                st.success("Acesso concedido!")
-                time.sleep(0.5)
+            user_check = df_u[(df_u['email'] == email_in) & (df_u['senha'] == senha_in)]
+            if not user_check.empty:
+                st.session_state.usuario = email_in
+                st.query_params["u_mail"] = email_in # Salva login no navegador
                 st.rerun()
-            else:
-                st.error("Usuário ou senha inválidos.")
+            else: st.error("E-mail ou Senha incorretos.")
 
-    with t_cadastro:
-        new_email = st.text_input("E-mail para cadastro", key="c_email").strip().lower()
-        new_senha = st.text_input("Crie uma senha", type="password", key="c_senha").strip()
-        new_tel = st.text_input("Telefone (WhatsApp)", key="c_tel").strip()
-        if st.button("CRIAR MINHA CONTA", use_container_width=True):
+    with tab_reg:
+        n_email = st.text_input("Novo E-mail").strip().lower()
+        n_senha = st.text_input("Nova Senha", type="password").strip()
+        n_tel = st.text_input("Telefone")
+        if st.button("CRIAR CONTA", use_container_width=True):
             df_u = carregar_users()
-            if new_email in df_u['email'].values:
-                st.warning("Este e-mail já está cadastrado.")
-            elif new_email and new_senha:
-                novo_u = pd.DataFrame([{"email": new_email, "senha": new_senha, "telefone": new_tel}])
+            if n_email in df_u['email'].values: st.warning("E-mail já existe.")
+            elif n_email and n_senha:
+                novo_u = pd.DataFrame([{"email": n_email, "senha": n_senha, "telefone": n_tel}])
                 pd.concat([df_u, novo_u], ignore_index=True).to_csv(FILE_USERS, index=False)
-                st.success("Conta criada com sucesso! Mude para a aba ACESSAR.")
-            else:
-                st.error("Por favor, preencha todos os campos.")
+                st.success("Cadastrado! Use a aba Login.")
     st.stop()
 
-# --- VARIÁVEIS DO USUÁRIO LOGADO ---
-user_atual = st.session_state.user_logado
+# --- DADOS DO USUÁRIO ---
+df_todos_hist = carregar_dados_todos()
+df_user_hist = df_todos_hist[df_todos_hist['Usuario'] == st.session_state.usuario].copy()
+df_todas_contas = carregar_contas_todas()
+user_contas_df = df_todas_contas[df_todas_contas['Usuario'] == st.session_state.usuario]
 
-df_hist_full = carregar_dados_v2()
-df_user_hist = df_hist_full[df_hist_full['Usuario'] == user_atual].copy()
-
-df_contas_full = carregar_contas_v2()
-user_contas_row = df_contas_full[df_contas_full['Usuario'] == user_atual]
-
-if not user_contas_row.empty:
-    minhas_contas = user_contas_row.iloc[0].to_dict()
+if not user_contas_df.empty:
+    st.session_state.contas = user_contas_df.iloc[0].to_dict()
 else:
-    minhas_contas = {"Usuario": user_atual, "Aluguel": 0.0, "Luz": 0.0, "Água": 0.0, "Internet": 0.0, "Cartões": 0.0, "Financiamentos": 0.0, "Outras": 0.0}
+    st.session_state.contas = {"Usuario": st.session_state.usuario, "Aluguel": 0.0, "Luz": 0.0, "Água": 0.0, "Internet": 0.0, "Cartões": 0.0, "Financiamentos": 0.0, "Outras": 0.0}
 
-# Cálculos de Meta
-total_meta_casa = sum(float(v) for k, v in minhas_contas.items() if k != "Usuario" and pd.notnull(v))
-dias_mes = calendar.monthrange(date.today().year, date.today().month)[1]
-dias_restantes = max(1, (dias_mes - date.today().day) + 1)
+if 'turno_ativo' not in st.session_state: st.session_state.turno_ativo = False
+if 'inicio_turno' not in st.session_state: st.session_state.inicio_turno = None
 
-# --- COMPONENTE DE RESULTADOS ---
-def renderizar_grade(b, l, k, h, meta, dias, titulo):
+hoje_ref = date.today()
+ultimo_dia = calendar.monthrange(hoje_ref.year, hoje_ref.month)[1]
+dias_restantes = max(1, (ultimo_dia - hoje_ref.day) + 1)
+total_casa = sum(float(v) for k, v in st.session_state.contas.items() if k != "Usuario" and v is not None)
+
+def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     c = b - l
-    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento {titulo}</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Custos</div><div class='big-val'>R$ {c:.2f}</div></div>", unsafe_allow_html=True)
-    with col2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {l:.2f}</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento {titulo_aba}</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
+    c_sub1, c_sub2 = st.columns(2)
+    with c_sub1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {c:.2f}</div></div>", unsafe_allow_html=True)
+    with c_sub2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {l:.2f}</div></div>", unsafe_allow_html=True)
     st.write("")
     g1, g2 = st.columns(2)
-    g1.markdown(f"<div class='grid-item'><div class='grid-label'>R$ / Hora</div><div class='grid-value'>R$ {b/h if h>0 else 0:.2f}</div></div>", unsafe_allow_html=True)
-    g2.markdown(f"<div class='grid-item'><div class='grid-label'>R$ / KM</div><div class='grid-value'>R$ {b/k if k>0 else 0:.2f}</div></div>", unsafe_allow_html=True)
+    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Hora Bruta</div><div class='grid-value'>R$ {(b/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(b/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    g3, g4 = st.columns(2)
+    with g3: 
+        hi, mi = int(h), int((h - int(h)) * 60)
+        st.markdown(f"<div class='grid-item'><div class='grid-label'>Tempo</div><div class='grid-value'>{hi:02d}:{mi:02d}</div></div>", unsafe_allow_html=True)
+    with g4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(l/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    g5, g6 = st.columns(2)
+    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{k:.1f}</div></div>", unsafe_allow_html=True)
+    with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(l/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
     
-    if meta > 0:
-        prog = min(l / meta, 1.0)
-        st.write(f"🏠 *Progresso das Contas:* {prog*100:.1f}%")
+    if total_meta > 0:
+        prog = min(max(0.0, l / total_meta), 1.0)
+        restante = total_meta - l
+        st.write(f"🏠 *Abate das Contas ({st.session_state.usuario}):* {prog*100:.1f}%")
         st.progress(prog)
-        st.write(f"🎯 *Meta Diária Restante:* R$ {max(0.0, (meta-l)/dias):.2f}")
+        st.write(f"📉 *Falta para quitar:* R$ {max(0.0, restante):.2f}")
 
-# --- ABAS PRINCIPAIS ---
-tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RES", "⏱️ TURNO", "➕ LANÇAR", "📅 HIST", "🏠 CONTAS"])
+tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "⏱️ TURNO", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
 
 with tab_res:
     if not df_user_hist.empty:
         u = df_user_hist.iloc[-1]
-        renderizar_grade(float(u["Bruto"]), float(u["Líquido"]), float(u["KM"]), float(u["Horas"]), total_meta_casa, dias_restantes, "Dia")
-    else:
-        st.info("Nenhum dado registrado hoje.")
+        renderizar_grade(float(u["Bruto"]), float(u["Líquido"]), float(u["KM"]), float(u["Horas"]), total_casa, dias_restantes, "Dia")
+    else: renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa, dias_restantes, "Dia")
 
 with tab_turno:
-    if 't_ativo' not in st.session_state: st.session_state.t_ativo = False
-    
-    if not st.session_state.t_ativo:
+    st.subheader(f"Modo Turno: {st.session_state.usuario}")
+    if not st.session_state.turno_ativo:
         if st.button("🚀 INICIAR TURNO", use_container_width=True, type="primary"):
-            st.session_state.t_inicio = datetime.now()
-            st.session_state.t_ativo = True
+            st.session_state.inicio_turno = datetime.now()
+            st.session_state.turno_ativo = True
             st.rerun()
     else:
-        decorrido = (datetime.now() - st.session_state.t_inicio).total_seconds() / 3600
-        st.metric("Tempo Online", f"{int(decorrido)}h {int((decorrido%1)*60)}min")
-        if st.button("🏁 FINALIZAR TURNO", use_container_width=True):
-            st.session_state.t_final = decorrido
-            st.session_state.t_ativo = "finalizando"
+        agora = datetime.now()
+        decorrido = agora - st.session_state.inicio_turno
+        horas_dec = decorrido.total_seconds() / 3600
+        st.metric("Tempo Online", f"{int(horas_dec)}h {int((horas_dec%1)*60)}min")
+        if st.button("🏁 ENCERRAR TURNO", use_container_width=True):
+            st.session_state.tempo_final = horas_dec
+            st.session_state.turno_ativo = "finalizando"
             st.rerun()
 
-    if st.session_state.t_ativo == "finalizando":
+    if st.session_state.turno_ativo == "finalizando":
         st.divider()
-        b_turno = st.number_input("Ganho Bruto (R$)", min_value=0.0)
-        k_turno = st.number_input("KM Rodados", min_value=0.0)
-        c_turno = st.number_input("Combustível (R$)", min_value=0.0)
-        if st.button("💾 SALVAR TURNO", use_container_width=True):
-            liq = b_turno - c_turno
-            horas = st.session_state.t_final if st.session_state.t_final > 0 else 0.1
-            km = k_turno if k_turno > 0 else 1.0
-            novo_reg = {"Data": date.today().strftime("%d/%m/%Y"), "Bruto": b_turno, "Líquido": liq, "KM": km, "Horas": horas, "KM_Liq": liq/km, "Hora_Liq": liq/horas, "Usuario": user_atual}
-            pd.concat([df_hist_full, pd.DataFrame([novo_reg])], ignore_index=True).to_csv(FILE_HIST, index=False)
-            st.session_state.t_ativo = False
+        b_turno = st.number_input("Ganho Bruto (R$)", value=0.0)
+        k_turno = st.number_input("KM Rodados", value=0.0)
+        c_turno = st.number_input("Combustível (R$)", value=0.0)
+        if st.button("💾 CONFIRMAR E SALVAR", use_container_width=True):
+            l_calc = b_turno - c_turno
+            h_calc = st.session_state.tempo_final if st.session_state.tempo_final > 0 else 0.1
+            k_calc = k_turno if k_turno > 0 else 1.0
+            novo = {"Data": date.today().strftime("%d/%m/%Y"), "Bruto": b_turno, "Líquido": l_calc, "KM": k_calc, "Horas": h_calc, "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc, "Usuario": st.session_state.usuario}
+            df_final = pd.concat([df_todos_hist, pd.DataFrame([novo])], ignore_index=True)
+            df_final.to_csv(FILE_HIST, index=False)
+            st.session_state.turno_ativo = False
             st.success("Salvo!")
             st.rerun()
 
 with tab_lan:
     st.subheader("Lançamento Manual")
-    d_lan = st.date_input("Data", value=date.today())
-    b_lan = st.number_input("Ganho Bruto", key="ml_b")
-    k_lan = st.number_input("KM Total", key="ml_k")
-    h_lan = st.number_input("Total Horas", key="ml_h")
-    c_lan = st.number_input("Gasto Combustível", key="ml_c")
+    data_lan = st.date_input("Data", value=date.today())
+    b_in = st.number_input("Ganho Bruto", value=0.0, key="b_man")
+    k_in = st.number_input("KM Total", value=0.0, key="k_man")
+    h_in = st.number_input("Horas", value=0.0, key="h_man")
+    c_in = st.number_input("Combustível", value=0.0, key="c_man")
     if st.button("💾 SALVAR DIA", use_container_width=True):
-        liq = b_lan - c_lan
-        novo_reg = {"Data": d_lan.strftime("%d/%m/%Y"), "Bruto": b_lan, "Líquido": liq, "KM": k_lan if k_lan>0 else 1, "Horas": h_lan if h_lan>0 else 1, "KM_Liq": liq/(k_lan if k_lan>0 else 1), "Hora_Liq": liq/(h_lan if h_lan>0 else 1), "Usuario": user_atual}
-        pd.concat([df_hist_full, pd.DataFrame([novo_reg])], ignore_index=True).to_csv(FILE_HIST, index=False)
-        st.success("Lançado!")
+        l_calc = b_in - c_in
+        novo = {"Data": data_lan.strftime("%d/%m/%Y"), "Bruto": b_in, "Líquido": l_calc, "KM": k_in if k_in > 0 else 1, "Horas": h_in if h_in > 0 else 1, "KM_Liq": l_calc/(k_in if k_in > 0 else 1), "Hora_Liq": l_calc/(h_in if h_in > 0 else 1), "Usuario": st.session_state.usuario}
+        pd.concat([df_todos_hist, pd.DataFrame([novo])], ignore_index=True).to_csv(FILE_HIST, index=False)
+        st.success("Salvo!")
         st.rerun()
 
 with tab_hist:
     if not df_user_hist.empty:
-        df_display = df_user_hist.copy()
-        df_display['Data_dt'] = pd.to_datetime(df_display['Data'], format='%d/%m/%Y')
-        st.dataframe(df_display.sort_values('Data_dt', ascending=False).drop(columns=['Data_dt', 'Usuario']), use_container_width=True)
-        
+        df_user_hist['Data_dt'] = pd.to_datetime(df_user_hist['Data'], format='%d/%m/%Y')
+        st.dataframe(df_user_hist.sort_values(by='Data_dt', ascending=False).drop(columns=['Data_dt', 'Usuario']), use_container_width=True)
         with st.expander("🗑️ Apagar Registro"):
-            opcoes = {f"{r['Data']} - R$ {r['Bruto']:.2f}": i for i, r in df_user_hist.iterrows()}
-            escolha = st.selectbox("Selecione o registro:", list(opcoes.keys()))
-            if st.button("APAGAR AGORA"):
-                df_hist_full.drop(opcoes[escolha]).to_csv(FILE_HIST, index=False)
-                st.success("Excluído!")
+            opcoes = {f"{row['Data']} - R$ {row['Bruto']:.2f}": idx for idx, row in df_user_hist.iterrows()}
+            selecionado = st.selectbox("Selecione:", options=list(opcoes.keys()))
+            if st.button("CONFIRMAR EXCLUSÃO"):
+                df_restante = df_todos_hist.drop(opcoes[selecionado])
+                df_restante.to_csv(FILE_HIST, index=False)
                 st.rerun()
-    else: st.info("Histórico vazio.")
+    else: st.info("Sem dados para este usuário.")
 
 with tab_contas:
-    st.subheader("Configurações")
-    for campo in ["Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"]:
-        minhas_contas[campo] = st.number_input(campo, value=float(minhas_contas.get(campo, 0)))
+    st.subheader(f"🏠 Contas de {st.session_state.usuario}")
+    c1, c2 = st.columns(2)
+    campos = ["Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"]
+    for i, campo in enumerate(campos):
+        col = c1 if i < 4 else c2
+        st.session_state.contas[campo] = col.number_input(campo, value=float(st.session_state.contas.get(campo, 0)))
     
-    if st.button("💾 SALVAR MINHAS CONTAS", use_container_width=True):
-        df_outros = df_contas_full[df_contas_full['Usuario'] != user_atual]
-        pd.concat([df_outros, pd.DataFrame([minhas_contas])], ignore_index=True).to_csv(FILE_CONTAS, index=False)
-        st.success("Contas atualizadas!")
+    col_save, col_logout = st.columns(2)
+    if col_save.button("💾 SALVAR CONTAS", use_container_width=True):
+        df_sem_user = df_todas_contas[df_todas_contas['Usuario'] != st.session_state.usuario]
+        df_novo_contas = pd.concat([df_sem_user, pd.DataFrame([st.session_state.contas])], ignore_index=True)
+        df_novo_contas.to_csv(FILE_CONTAS, index=False)
+        st.success("Salvo!")
         st.rerun()
     
-    st.divider()
-    if st.button("🚪 SAIR DO SISTEMA", use_container_width=True):
-        st.session_state.user_logado = None
+    if col_logout.button("🚪 SAIR / DESLOGAR", use_container_width=True):
+        st.session_state.usuario = None
+        st.query_params.clear() 
         st.rerun()
