@@ -12,7 +12,7 @@ st.set_page_config(
     page_icon="🚗"
 )
 
-# --- CSS PARA APP E BOTÃO VERMELHO ---
+# --- CSS PARA APP, GRADE 2x3 E BOTÃO VERMELHO ---
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -38,6 +38,9 @@ st.markdown("""
     .grid-item { background-color: #1C1C1E; border-radius: 12px; padding: 10px 2px; text-align: center; border: 1px solid #2C2C2E; margin-bottom: 5px; min-height: 85px; display: flex; flex-direction: column; justify-content: center; }
     .grid-label { color: #ffffff !important; font-size: 9px; font-weight: bold; text-transform: uppercase; opacity: 0.8; }
     .grid-value { color: #FFFFFF !important; font-size: 14px; font-weight: bold; }
+    .stTabs [data-baseweb="tab-list"] { gap: 2px; }
+    .stTabs [data-baseweb="tab"] { background-color: #1C1C1E; border-radius: 8px 8px 0 0; color: #ffffff !important; padding: 8px; font-size: 12px; }
+    .stTabs [aria-selected="true"] { background-color: #FF4500 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -58,10 +61,13 @@ if st.session_state.usuario is None:
 
 # --- FUNÇÕES DE DADOS ---
 def carregar_tudo():
-    return conn.read(worksheet="dados", ttl=0)
+    try:
+        return conn.read(worksheet="dados", ttl=0)
+    except:
+        return pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas", "Usuario"])
 
 def limpar_historico_usuario():
-    df_atual = conn.read(worksheet="dados", ttl=0)
+    df_atual = carregar_tudo()
     df_novo = df_atual[df_atual['Usuario'] != st.session_state.usuario]
     conn.update(worksheet="dados", data=df_novo)
     st.success("Histórico limpo!")
@@ -70,10 +76,14 @@ def limpar_historico_usuario():
 # --- LOGICA APP ---
 df_completo = carregar_tudo()
 df_user = df_completo[df_completo['Usuario'] == st.session_state.usuario].copy()
+
 if 'contas' not in st.session_state:
-    df_c = conn.read(worksheet="contas", ttl=0)
-    user_c = df_c[df_c['Usuario'] == st.session_state.usuario]
-    st.session_state.contas = user_c.iloc[0].to_dict() if not user_c.empty else {"Aluguel":0,"Luz":0,"Água":0,"Internet":0,"Cartões":0,"Financiamentos":0,"Outras":0}
+    try:
+        df_c = conn.read(worksheet="contas", ttl=0)
+        user_c = df_c[df_c['Usuario'] == st.session_state.usuario]
+        st.session_state.contas = user_c.iloc[0].to_dict() if not user_c.empty else {"Aluguel":0,"Luz":0,"Água":0,"Internet":0,"Cartões":0,"Financiamentos":0,"Outras":0}
+    except:
+        st.session_state.contas = {"Aluguel":0,"Luz":0,"Água":0,"Internet":0,"Cartões":0,"Financiamentos":0,"Outras":0}
 
 total_casa = sum(float(v) for k, v in st.session_state.contas.items() if k != 'Usuario')
 hoje_ref = date.today()
@@ -110,6 +120,7 @@ with tab_res:
         u = df_user.iloc[-1]
         renderizar_grade(float(u["Bruto"]), float(u["Líquido"]), float(u["KM"]), float(u["Horas"]), "Dia")
     else: renderizar_grade(0,0,1,1,"Dia")
+    st.divider()
     if st.button("🗑️ LIMPAR MEU HISTÓRICO", key="btn_res", use_container_width=True): limpar_historico_usuario()
 
 with tab_turno:
@@ -129,7 +140,7 @@ with tab_turno:
     if st.session_state.get('turno_ativo') == "finalizando":
         b_t = st.number_input("Bruto R$", value=0.0)
         k_t = st.number_input("KM", value=0.0)
-        if st.button("💾 SALVAR TURNO"):
+        if st.button("💾 SALVAR TURNO", use_container_width=True):
             novo = pd.DataFrame([{"Data":date.today().strftime("%d/%m/%Y"), "Bruto":b_t, "Líquido":b_t, "KM":k_t, "Horas":st.session_state.tempo_final, "Usuario":st.session_state.usuario}])
             conn.update(worksheet="dados", data=pd.concat([df_completo, novo]))
             st.session_state.turno_ativo = False
@@ -153,13 +164,15 @@ with tab_lan:
 with tab_hist:
     if not df_user.empty:
         renderizar_grade(df_user["Bruto"].sum(), df_user["Líquido"].sum(), df_user["KM"].sum(), df_user["Horas"].sum(), "Total")
+        st.divider()
         st.dataframe(df_user.drop(columns=["Usuario"]), use_container_width=True)
+    st.divider()
     if st.button("🗑️ LIMPAR MEU HISTÓRICO", key="btn_hist", use_container_width=True): limpar_historico_usuario()
 
 with tab_contas:
     st.subheader("🏠 Contas")
-    # ... Lógica de salvar contas no Sheets ...
     if st.button("🚪 SAIR", use_container_width=True):
         st.session_state.usuario = None
         st.rerun()
+    st.divider()
     if st.button("🗑️ LIMPAR MEU HISTÓRICO", key="btn_contas", use_container_width=True): limpar_historico_usuario()
