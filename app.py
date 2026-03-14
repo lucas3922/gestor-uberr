@@ -115,10 +115,8 @@ with tab_turno:
         agora = datetime.now()
         decorrido = agora - st.session_state.inicio_turno
         horas_dec = decorrido.total_seconds() / 3600
-        
         st.info(f"⏱️ Turno iniciado às: {st.session_state.inicio_turno.strftime('%H:%M')}")
         st.metric("Tempo Online", f"{int(horas_dec)}h {int((horas_dec%1)*60)}min")
-        
         if st.button("🏁 ENCERRAR TURNO", use_container_width=True):
             st.session_state.tempo_final = horas_dec
             st.session_state.turno_ativo = "finalizando"
@@ -130,7 +128,6 @@ with tab_turno:
         b_turno = st.number_input("Ganho Bruto (R$)", value=0.0)
         k_turno = st.number_input("KM Rodados", value=0.0)
         c_turno = st.number_input("Combustível (R$)", value=0.0)
-        
         if st.button("💾 CONFIRMAR E SALVAR", use_container_width=True):
             l_calc = b_turno - c_turno
             h_calc = st.session_state.tempo_final if st.session_state.tempo_final > 0 else 0.1
@@ -165,17 +162,40 @@ with tab_hist:
         df_h = st.session_state.historico.copy()
         df_h['Data_dt'] = pd.to_datetime(df_h['Data'], format='%d/%m/%Y')
         hoje_agora = datetime.now()
-        
         periodo = st.radio("Período:", ["Semana", "Mês", "Ano"], horizontal=True)
         if periodo == "Semana": mask = df_h['Data_dt'] > (hoje_agora - timedelta(days=7))
         elif periodo == "Mês": mask = df_h['Data_dt'].dt.month == hoje_agora.month
         else: mask = df_h['Data_dt'].dt.year == hoje_agora.year
-        
         df_p = df_h[mask]
-        if not df_p.empty: 
-            renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
-        
+        if not df_p.empty: renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
         st.divider()
-        st.subheader("Lista de Registros")
+        display_df = df_h.sort_values(by='Data_dt', ascending=False).drop(columns=['Data_dt'])
+        st.dataframe(display_df, use_container_width=True)
         
-        # Exibição da tabela com índices para facilitar a exclus
+        # --- FUNÇÃO DE APAGAR REGISTRO ---
+        with st.expander("🗑️ Apagar Registro do Histórico"):
+            opcoes = {f"{row['Data']} - R$ {row['Bruto']:.2f}": idx for idx, row in st.session_state.historico.iterrows()}
+            if opcoes:
+                selecionado = st.selectbox("Selecione para apagar:", options=list(opcoes.keys()))
+                if st.button("CONFIRMAR EXCLUSÃO", use_container_width=True):
+                    idx_remover = opcoes[selecionado]
+                    st.session_state.historico = st.session_state.historico.drop(idx_remover).reset_index(drop=True)
+                    st.session_state.historico.to_csv(FILE_HIST, index=False)
+                    st.success("Removido!")
+                    time.sleep(1)
+                    st.rerun()
+    else: st.info("Sem dados.")
+
+with tab_contas:
+    st.subheader("🏠 Contas da Casa")
+    c1, c2 = st.columns(2)
+    campos = ["Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"]
+    for i, campo in enumerate(campos):
+        col = c1 if i < 4 else c2
+        st.session_state.contas[campo] = col.number_input(campo, value=float(st.session_state.contas.get(campo, 0)))
+    if st.button("💾 SALVAR CONTAS", use_container_width=True):
+        pd.DataFrame([st.session_state.contas]).to_csv(FILE_CONTAS, index=False)
+        st.success("Contas salvas!")
+        st.rerun()
+    st.divider()
+    st.metric("TOTAL MENSAL", f"R$ {total_casa:.2f}")
