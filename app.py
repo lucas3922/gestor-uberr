@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
 import calendar
-from streamlit_gsheets import GSheetsConnection
+import os
 
 # Configuração de App Mobile
 st.set_page_config(
@@ -12,158 +12,167 @@ st.set_page_config(
     page_icon="🚗"
 )
 
-# --- CSS ORIGINAL (MANTIDO 100%) ---
+# --- CSS PARA INTERFACE DARK MODE E GRADE 2x3 ---
 st.markdown("""
 <style>
     .stApp { background-color: #000000; color: #ffffff; }
-    .block-container { padding-top: 0.5rem; padding-bottom: 2rem; }
+    .block-container { padding-top: 1rem; padding-bottom: 2rem; }
     header {visibility: hidden;}
     footer {visibility: hidden;}
+    
     label, p, span, h1, h2, h3, .stMarkdown { color: #ffffff !important; }
     [data-testid="column"] { width: 50% !important; flex: 1 1 45% !important; min-width: 45% !important; }
     
-    div.stButton > button:first-child:contains("LIMPAR") {
-        color: #FF0000 !important;
-        border-color: #FF0000 !important;
-        background-color: transparent !important;
-    }
+    /* Estilo dos Cards Principais */
+    .card-faturamento { background-color: #00FF00; color: black !important; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 10px; }
+    .card-despesa { background-color: #FF0000; color: white !important; border-radius: 12px; padding: 15px; text-align: center; }
+    .card-saldo { background-color: #800080; color: white !important; border-radius: 12px; padding: 15px; text-align: center; }
+    
+    .big-val { font-size: 22px; font-weight: bold; }
+    .label-card { font-size: 11px; font-weight: 600; text-transform: uppercase; }
 
-    .card-faturamento { background-color: #00FF00; color: black !important; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 10px; width: 100% !important; }
-    .card-despesa { background-color: #FF0000; color: white !important; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
-    .card-saldo { background-color: #800080; color: white !important; border-radius: 12px; padding: 15px; text-align: center; width: 100% !important; }
-    .big-val { font-size: 20px; font-weight: bold; }
-    .label-card { font-size: 10px; font-weight: 600; text-transform: uppercase; }
-    .grid-item { background-color: #1C1C1E; border-radius: 12px; padding: 10px 2px; text-align: center; border: 1px solid #2C2C2E; margin-bottom: 5px; min-height: 85px; display: flex; flex-direction: column; justify-content: center; }
-    .grid-label { color: #ffffff !important; font-size: 9px; font-weight: bold; text-transform: uppercase; opacity: 0.8; }
-    .grid-value { color: #FFFFFF !important; font-size: 14px; font-weight: bold; }
-    .stTabs [data-baseweb="tab-list"] { gap: 5px; }
-    .stTabs [data-baseweb="tab"] { background-color: #1C1C1E; border-radius: 8px; color: #ffffff !important; padding: 0 10px; }
-    .stTabs [aria-selected="true"] { background-color: #FF4500 !important; color: white !important; }
+    /* Grade de Métricas 2x3 */
+    .grid-item { 
+        background-color: #1C1C1E; 
+        border-radius: 12px; 
+        padding: 12px 5px; 
+        text-align: center; 
+        border: 1px solid #2C2C2E; 
+        margin-bottom: 8px;
+        min-height: 90px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .grid-label { color: #ffffff !important; font-size: 10px; font-weight: bold; text-transform: uppercase; opacity: 0.8; }
+    .grid-value { color: #FFFFFF !important; font-size: 16px; font-weight: bold; }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #1C1C1E;
+        border-radius: 8px 8px 0 0;
+        color: #ffffff !important;
+        padding: 10px;
+    }
+    .stTabs [aria-selected="true"] { background-color: #FF4500 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- CONEXÃO GOOGLE SHEETS ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+# --- LÓGICA DE DADOS (CSV LOCAL) ---
+DB_FILE = "dados_uber.csv"
 
-# --- LOGIN ---
-if 'usuario' not in st.session_state: st.session_state.usuario = None
-if st.session_state.usuario is None:
-    st.title("🚗 UberPro Login")
-    user_input = st.text_input("Seu nome:").strip().lower()
-    if st.button("ENTRAR", use_container_width=True):
-        if user_input:
-            st.session_state.usuario = user_input
-            st.rerun()
-    st.stop()
+def carregar_dados():
+    if os.path.exists(DB_FILE):
+        return pd.read_csv(DB_FILE)
+    return pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas"])
 
-# --- FUNÇÕES ---
-def carregar():
-    try: return conn.read(ttl=0)
-    except: return pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas", "Usuario"])
+if 'historico' not in st.session_state:
+    st.session_state.historico = carregar_dados()
 
-df_completo = carregar()
-df_user = df_completo[df_completo['Usuario'] == st.session_state.usuario].copy()
+def salvar_dados(df):
+    df.to_csv(DB_FILE, index=False)
+    st.session_state.historico = df
 
-if 'contas' not in st.session_state:
-    st.session_state.contas = {"Aluguel":0,"Luz":0,"Água":0,"Internet":0,"Cartões":0,"Financiamentos":0,"Outras":0}
-
-total_casa = sum(float(v) for k, v in st.session_state.contas.items() if k != 'Usuario')
+# --- CÁLCULOS DE METAS ---
 hoje_ref = date.today()
-dias_restantes = max(1, (calendar.monthrange(hoje_ref.year, hoje_ref.month)[1] - hoje_ref.day) + 1)
+ultimo_dia = calendar.monthrange(hoje_ref.year, hoje_ref.month)[1]
+dias_restantes = max(1, (ultimo_dia - hoje_ref.day) + 1)
 
-def renderizar_grade(b, l, k, h, t=""):
-    c = b - l
-    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento {t}</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {c:.2f}</div></div>", unsafe_allow_html=True)
-    with c2: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo</div><div class='big-val'>R$ {l:.2f}</div></div>", unsafe_allow_html=True)
+# --- FUNÇÃO DE RENDERIZAR GRADE 2x3 ---
+def renderizar_grade(bruto, liquido, km, horas, titulo_principal=""):
+    custo = bruto - liquido
+    
+    # Cards de Topo
+    st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento {titulo_principal}</div><div class='big-val'>R$ {bruto:.2f}</div></div>", unsafe_allow_html=True)
+    
+    col_a, col_b = st.columns(2)
+    with col_a: st.markdown(f"<div class='card-despesa'><div class='label-card'>Despesas</div><div class='big-val'>R$ {custo:.2f}</div></div>", unsafe_allow_html=True)
+    with col_b: st.markdown(f"<div class='card-saldo'><div class='label-card'>Saldo Líquido</div><div class='big-val'>R$ {liquido:.2f}</div></div>", unsafe_allow_html=True)
+    
     st.write("")
+    
+    # Grade 2x3
     g1, g2 = st.columns(2)
-    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Hora Bruta</div><div class='grid-value'>R$ {(b/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-    with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(b/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    with g1: st.markdown(f"<div class='grid-item'><div class='grid-label'>Hora Bruta</div><div class='grid-value'>R$ {(bruto/horas if horas > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    with g2: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Bruto</div><div class='grid-value'>R$ {(bruto/km if km > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    
     g3, g4 = st.columns(2)
     with g3: 
-        hi, mi = int(h), int((h - int(h)) * 60)
-        st.markdown(f"<div class='grid-item'><div class='grid-label'>Tempo</div><div class='grid-value'>{hi:02d}:{mi:02d}</div></div>", unsafe_allow_html=True)
-    with g4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(l/h if h > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+        h_int = int(horas)
+        m_int = int((horas - h_int) * 60)
+        st.markdown(f"<div class='grid-item'><div class='grid-label'>Tempo Total</div><div class='grid-value'>{h_int:02d}:{m_int:02d}h</div></div>", unsafe_allow_html=True)
+    with g4: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/Hora</div><div class='grid-value'>R$ {(liquido/horas if horas > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
+    
     g5, g6 = st.columns(2)
-    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{k:.1f}</div></div>", unsafe_allow_html=True)
-    with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(l/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-    if total_casa > 0:
-        prog = min(max(0.0, l / total_casa), 1.0)
-        st.write(f"🏠 *Abate Contas:* {prog*100:.1f}%")
-        st.progress(prog)
+    with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{km:.1f} km</div></div>", unsafe_allow_html=True)
+    with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(liquido/km if km > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
 
-# --- ABAS ---
-tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RES", "⏱️ TURNO", "➕ LANÇAR", "📅 HIST", "🏠 CONTAS"])
+# --- INTERFACE POR ABAS ---
+tab_res, tab_turno, tab_lan, tab_hist = st.tabs(["📊 RES", "⏱️ TURNO", "➕ LANÇAR", "📅 HIST"])
 
 with tab_res:
-    if not df_user.empty:
-        u = df_user.iloc[-1]
-        renderizar_grade(float(u["Bruto"]), float(u["Líquido"]), float(u["KM"]), float(u["Horas"]), "Dia")
-    else: renderizar_grade(0,0,1,1,"Dia")
-    st.divider()
-    if st.button("🗑️ LIMPAR MEU HISTÓRICO", key="br1", use_container_width=True):
-        conn.update(data=df_completo[df_completo['Usuario'] != st.session_state.usuario])
-        st.rerun()
+    if not st.session_state.historico.empty:
+        u = st.session_state.historico.iloc[-1]
+        renderizar_grade(u['Bruto'], u['Líquido'], u['KM'], u['Horas'], "do Dia")
+    else:
+        st.info("Nenhum dado lançado ainda.")
 
 with tab_turno:
-    st.subheader("Modo Turno")
-    if 'turno_ativo' not in st.session_state or not st.session_state.turno_ativo:
+    st.subheader("Controle de Turno")
+    if 'turno_ativo' not in st.session_state: st.session_state.turno_ativo = False
+
+    if not st.session_state.turno_ativo:
         if st.button("🚀 INICIAR TURNO", use_container_width=True):
             st.session_state.inicio_turno = datetime.now()
             st.session_state.turno_ativo = True
             st.rerun()
     else:
-        decorrido = (datetime.now() - st.session_state.inicio_turno).total_seconds() / 3600
+        agora = datetime.now()
+        decorrido = (agora - st.session_state.inicio_turno).total_seconds() / 3600
         st.metric("Tempo Online", f"{int(decorrido)}h {int((decorrido%1)*60)}min")
+        
         if st.button("🏁 ENCERRAR TURNO", use_container_width=True):
             st.session_state.tempo_final = decorrido
             st.session_state.turno_ativo = "finalizando"
             st.rerun()
+
     if st.session_state.get('turno_ativo') == "finalizando":
-        b_t = st.number_input("Bruto R$", value=0.0)
-        k_t = st.number_input("KM", value=0.0)
-        if st.button("💾 SALVAR TURNO", use_container_width=True):
-            novo = pd.DataFrame([{"Data":date.today().strftime("%d/%m/%Y"), "Bruto":b_t, "Líquido":b_t, "KM":k_t, "Horas":st.session_state.tempo_final, "Usuario":st.session_state.usuario}])
-            conn.update(data=pd.concat([df_completo, novo]))
+        bruto_t = st.number_input("Total Bruto (R$)", min_value=0.0)
+        km_t = st.number_input("KM Percorrido", min_value=0.0)
+        if st.button("💾 SALVAR TURNO"):
+            novo_dia = pd.DataFrame([{
+                "Data": hoje_ref.strftime("%d/%m/%Y"),
+                "Bruto": bruto_t,
+                "Líquido": bruto_t * 0.75, # Exemplo de cálculo de líquido
+                "KM": km_t,
+                "Horas": st.session_state.tempo_final
+            }])
+            salvar_dados(pd.concat([st.session_state.historico, novo_dia], ignore_index=True))
             st.session_state.turno_ativo = False
+            st.success("Turno salvo!")
             st.rerun()
-    st.divider()
-    if st.button("🗑️ LIMPAR MEU HISTÓRICO", key="br2", use_container_width=True):
-        conn.update(data=df_completo[df_completo['Usuario'] != st.session_state.usuario])
-        st.rerun()
 
 with tab_lan:
     st.subheader("Lançamento Manual")
-    b_man = st.number_input("Ganho Bruto", value=0.0)
-    k_man = st.number_input("KM", value=0.0)
-    h_man = st.number_input("Horas", value=0.0)
-    if st.button("💾 SALVAR DIA", use_container_width=True):
-        novo = pd.DataFrame([{"Data":date.today().strftime("%d/%m/%Y"), "Bruto":b_man, "Líquido":b_man, "KM":k_man, "Horas":h_man, "Usuario":st.session_state.usuario}])
-        conn.update(data=pd.concat([df_completo, novo]))
-        st.rerun()
-    st.divider()
-    if st.button("🗑️ LIMPAR MEU HISTÓRICO", key="br3", use_container_width=True):
-        conn.update(data=df_completo[df_completo['Usuario'] != st.session_state.usuario])
-        st.rerun()
+    with st.form("manual"):
+        f_bruto = st.number_input("Valor Bruto (R$)", min_value=0.0)
+        f_km = st.number_input("KM Total", min_value=0.0)
+        f_horas = st.number_input("Horas Trabalhadas", min_value=0.1)
+        if st.form_submit_button("SALVAR DIA"):
+            novo_dia = pd.DataFrame([{
+                "Data": hoje_ref.strftime("%d/%m/%Y"),
+                "Bruto": f_bruto,
+                "Líquido": f_bruto * 0.75,
+                "KM": f_km,
+                "Horas": f_horas
+            }])
+            salvar_dados(pd.concat([st.session_state.historico, novo_dia], ignore_index=True))
+            st.success("Dados salvos!")
 
 with tab_hist:
-    if not df_user.empty:
-        renderizar_grade(df_user["Bruto"].sum(), df_user["Líquido"].sum(), df_user["KM"].sum(), df_user["Horas"].sum(), "Total")
-        st.divider()
-        st.dataframe(df_user.drop(columns=["Usuario"]), use_container_width=True)
-    st.divider()
-    if st.button("🗑️ LIMPAR MEU HISTÓRICO", key="br4", use_container_width=True):
-        conn.update(data=df_completo[df_completo['Usuario'] != st.session_state.usuario])
-        st.rerun()
-
-with tab_contas:
-    st.subheader("🏠 Contas")
-    if st.button("🚪 SAIR", use_container_width=True):
-        st.session_state.usuario = None
-        st.rerun()
-    st.divider()
-    if st.button("🗑️ LIMPAR MEU HISTÓRICO", key="br5", use_container_width=True):
-        conn.update(data=df_completo[df_completo['Usuario'] != st.session_state.usuario])
-        st.rerun()
+    st.subheader("Histórico de Ganhos")
+    if not st.session_state.historico.empty:
+        st.dataframe(st.session_state.historico, use_container_width=True)
+    else:
+        st.write("Histórico vazio.")
