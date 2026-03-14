@@ -1,4 +1,4 @@
-Import streamlit as st
+import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
 import calendar
@@ -33,6 +33,8 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] { gap: 5px; }
     .stTabs [data-baseweb="tab"] { background-color: #1C1C1E; border-radius: 8px; color: #ffffff !important; padding: 0 10px; }
     .stTabs [aria-selected="true"] { background-color: #FF4500 !important; color: white !important; }
+    
+    /* Botões de Turno */
     .stButton>button { border-radius: 12px; height: 3em; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
@@ -41,54 +43,34 @@ st.markdown("""
 FILE_HIST = "dados_uber.csv"
 FILE_CONTAS = "contas_uber.csv"
 
-def carregar_dados_todos():
+def carregar_dados():
     if os.path.exists(FILE_HIST):
         try: return pd.read_csv(FILE_HIST)
         except: pass
-    return pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas", "KM_Liq", "Hora_Liq", "Usuario"])
+    return pd.DataFrame(columns=["Data", "Bruto", "Líquido", "KM", "Horas", "KM_Liq", "Hora_Liq"])
 
-def carregar_contas_todas():
+def carregar_contas():
+    padrao = {"Aluguel": 0.0, "Luz": 0.0, "Água": 0.0, "Internet": 0.0, "Cartões": 0.0, "Financiamentos": 0.0, "Outras": 0.0}
     if os.path.exists(FILE_CONTAS):
-        try: return pd.read_csv(FILE_CONTAS)
+        try:
+            df = pd.read_csv(FILE_CONTAS)
+            if not df.empty: return df.iloc[0].to_dict()
         except: pass
-    return pd.DataFrame(columns=["Usuario", "Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"])
+    return padrao
 
-# --- SISTEMA DE LOGIN ---
-if 'usuario' not in st.session_state:
-    st.session_state.usuario = None
-
-if st.session_state.usuario is None:
-    st.markdown("<h2 style='text-align: center;'>🚗 UberPro Login</h2>", unsafe_allow_html=True)
-    user_input = st.text_input("Digite seu nome para acessar:", placeholder="Ex: Lucas").strip().lower()
-    if st.button("ENTRAR NO SISTEMA", use_container_width=True):
-        if user_input:
-            st.session_state.usuario = user_input
-            st.rerun()
-    st.stop()
-
-# --- FILTRAGEM DE DADOS POR USUÁRIO ---
-df_todos_hist = carregar_dados_todos()
-df_user_hist = df_todos_hist[df_todos_hist['Usuario'] == st.session_state.usuario].copy()
-
-df_todas_contas = carregar_contas_todas()
-user_contas_df = df_todas_contas[df_todas_contas['Usuario'] == st.session_state.usuario]
-
-if not user_contas_df.empty:
-    st.session_state.contas = user_contas_df.iloc[0].to_dict()
-else:
-    st.session_state.contas = {"Usuario": st.session_state.usuario, "Aluguel": 0.0, "Luz": 0.0, "Água": 0.0, "Internet": 0.0, "Cartões": 0.0, "Financiamentos": 0.0, "Outras": 0.0}
-
-# Inicialização de Turno
+# Inicialização
+if 'historico' not in st.session_state: st.session_state.historico = carregar_dados()
+if 'contas' not in st.session_state: st.session_state.contas = carregar_contas()
 if 'turno_ativo' not in st.session_state: st.session_state.turno_ativo = False
 if 'inicio_turno' not in st.session_state: st.session_state.inicio_turno = None
 
-# Variáveis Globais de Cálculo
 hoje_ref = date.today()
 ultimo_dia = calendar.monthrange(hoje_ref.year, hoje_ref.month)[1]
 dias_restantes = max(1, (ultimo_dia - hoje_ref.day) + 1)
-total_casa = sum(float(v) for k, v in st.session_state.contas.items() if k != "Usuario" and v is not None)
+total_casa = sum(float(v) for v in st.session_state.contas.values() if v is not None)
 
-# --- FUNÇÃO DE RENDERIZAR GRADE ---
+tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "⏱️ TURNO", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
+
 def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     c = b - l
     st.markdown(f"<div class='card-faturamento'><div class='label-card'>Faturamento {titulo_aba}</div><div class='big-val'>R$ {b:.2f}</div></div>", unsafe_allow_html=True)
@@ -107,26 +89,23 @@ def renderizar_grade(b, l, k, h, total_meta, dias_f, titulo_aba=""):
     g5, g6 = st.columns(2)
     with g5: st.markdown(f"<div class='grid-item'><div class='grid-label'>KM Rodado</div><div class='grid-value'>{k:.1f}</div></div>", unsafe_allow_html=True)
     with g6: st.markdown(f"<div class='grid-item'><div class='grid-label'>Líq/KM</div><div class='grid-value'>R$ {(l/k if k > 0 else 0):.2f}</div></div>", unsafe_allow_html=True)
-    
     if total_meta > 0:
         prog = min(max(0.0, l / total_meta), 1.0)
         restante = total_meta - l
         meta_real = restante / dias_f if dias_f > 0 else restante
-        st.write(f"🏠 *Abate das Contas ({st.session_state.usuario.capitalize()}):* {prog*100:.1f}%")
+        st.write(f"🏠 *Abate das Contas da Casa:* {prog*100:.1f}%")
         st.progress(prog)
-        st.write(f"📉 *Falta para quitar:* R$ {max(0.0, restante):.2f}")
-
-# --- ABAS ---
-tab_res, tab_turno, tab_lan, tab_hist, tab_contas = st.tabs(["📊 RESULTADOS", "⏱️ TURNO", "➕ LANÇAR", "📅 HISTÓRICO", "🏠 CONTAS"])
+        st.write(f"📉 *Falta para quitar o mês:* R$ {max(0.0, restante):.2f}")
+        st.write(f"🎯 *Meta diária p/ os {dias_f} dias restantes:* R$ {max(0.0, meta_real):.2f}")
 
 with tab_res:
-    if not df_user_hist.empty:
-        u = df_user_hist.iloc[-1]
+    if not st.session_state.historico.empty:
+        u = st.session_state.historico.iloc[-1]
         renderizar_grade(float(u["Bruto"]), float(u["Líquido"]), float(u["KM"]), float(u["Horas"]), total_casa, dias_restantes, "Dia")
     else: renderizar_grade(0.0, 0.0, 1.0, 1.0, total_casa, dias_restantes, "Dia")
 
 with tab_turno:
-    st.subheader(f"Modo Turno: {st.session_state.usuario.capitalize()}")
+    st.subheader("Modo Turno")
     if not st.session_state.turno_ativo:
         if st.button("🚀 INICIAR TURNO", use_container_width=True, type="primary"):
             st.session_state.inicio_turno = datetime.now()
@@ -136,6 +115,7 @@ with tab_turno:
         agora = datetime.now()
         decorrido = agora - st.session_state.inicio_turno
         horas_dec = decorrido.total_seconds() / 3600
+        st.info(f"⏱️ Turno iniciado às: {st.session_state.inicio_turno.strftime('%H:%M')}")
         st.metric("Tempo Online", f"{int(horas_dec)}h {int((horas_dec%1)*60)}min")
         if st.button("🏁 ENCERRAR TURNO", use_container_width=True):
             st.session_state.tempo_final = horas_dec
@@ -144,6 +124,7 @@ with tab_turno:
 
     if st.session_state.turno_ativo == "finalizando":
         st.divider()
+        st.subheader("Resumo do Turno")
         b_turno = st.number_input("Ganho Bruto (R$)", value=0.0)
         k_turno = st.number_input("KM Rodados", value=0.0)
         c_turno = st.number_input("Combustível (R$)", value=0.0)
@@ -151,11 +132,11 @@ with tab_turno:
             l_calc = b_turno - c_turno
             h_calc = st.session_state.tempo_final if st.session_state.tempo_final > 0 else 0.1
             k_calc = k_turno if k_turno > 0 else 1.0
-            novo = {"Data": date.today().strftime("%d/%m/%Y"), "Bruto": b_turno, "Líquido": l_calc, "KM": k_calc, "Horas": h_calc, "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc, "Usuario": st.session_state.usuario}
-            df_final = pd.concat([df_todos_hist, pd.DataFrame([novo])], ignore_index=True)
-            df_final.to_csv(FILE_HIST, index=False)
+            novo = {"Data": date.today().strftime("%d/%m/%Y"), "Bruto": b_turno, "Líquido": l_calc, "KM": k_calc, "Horas": h_calc, "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc}
+            st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo])], ignore_index=True)
+            st.session_state.historico.to_csv(FILE_HIST, index=False)
             st.session_state.turno_ativo = False
-            st.success("Salvo!")
+            st.success("Turno salvo com sucesso!")
             st.rerun()
 
 with tab_lan:
@@ -166,46 +147,55 @@ with tab_lan:
     h_in = st.number_input("Horas", value=0.0, key="h_man")
     c_in = st.number_input("Combustível", value=0.0, key="c_man")
     if st.button("💾 SALVAR DIA", use_container_width=True):
-        l_calc = b_in - c_in
-        novo = {"Data": data_lan.strftime("%d/%m/%Y"), "Bruto": b_in, "Líquido": l_calc, "KM": k_in if k_in > 0 else 1, "Horas": h_in if h_in > 0 else 1, "KM_Liq": l_calc/(k_in if k_in > 0 else 1), "Hora_Liq": l_calc/(h_in if h_in > 0 else 1), "Usuario": st.session_state.usuario}
-        pd.concat([df_todos_hist, pd.DataFrame([novo])], ignore_index=True).to_csv(FILE_HIST, index=False)
-        st.success("Salvo!")
-        st.rerun()
+        if b_in > 0:
+            l_calc = b_in - c_in
+            k_calc = k_in if k_in > 0 else 1.0
+            h_calc = h_in if h_in > 0 else 1.0
+            novo = {"Data": data_lan.strftime("%d/%m/%Y"), "Bruto": b_in, "Líquido": l_calc, "KM": k_calc, "Horas": h_calc, "KM_Liq": l_calc/k_calc, "Hora_Liq": l_calc/h_calc}
+            st.session_state.historico = pd.concat([st.session_state.historico, pd.DataFrame([novo])], ignore_index=True)
+            st.session_state.historico.to_csv(FILE_HIST, index=False)
+            st.success("Salvo!")
+            st.rerun()
 
 with tab_hist:
-    if not df_user_hist.empty:
-        df_user_hist['Data_dt'] = pd.to_datetime(df_user_hist['Data'], format='%d/%m/%Y')
+    if not st.session_state.historico.empty:
+        df_h = st.session_state.historico.copy()
+        df_h['Data_dt'] = pd.to_datetime(df_h['Data'], format='%d/%m/%Y')
+        hoje_agora = datetime.now()
         periodo = st.radio("Período:", ["Semana", "Mês", "Ano"], horizontal=True)
-        # Filtros simplificados para o usuário
-        st.dataframe(df_user_hist.sort_values(by='Data_dt', ascending=False).drop(columns=['Data_dt', 'Usuario']), use_container_width=True)
+        if periodo == "Semana": mask = df_h['Data_dt'] > (hoje_agora - timedelta(days=7))
+        elif periodo == "Mês": mask = df_h['Data_dt'].dt.month == hoje_agora.month
+        else: mask = df_h['Data_dt'].dt.year == hoje_agora.year
+        df_p = df_h[mask]
+        if not df_p.empty: renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
+        st.divider()
+        display_df = df_h.sort_values(by='Data_dt', ascending=False).drop(columns=['Data_dt'])
+        st.dataframe(display_df, use_container_width=True)
         
-        with st.expander("🗑️ Apagar Registro"):
-            opcoes = {f"{row['Data']} - R$ {row['Bruto']:.2f}": idx for idx, row in df_user_hist.iterrows()}
-            selecionado = st.selectbox("Selecione:", options=list(opcoes.keys()))
-            if st.button("CONFIRMAR EXCLUSÃO"):
-                df_restante = df_todos_hist.drop(opcoes[selecionado])
-                df_restante.to_csv(FILE_HIST, index=False)
-                st.rerun()
-    else: st.info("Sem dados para este usuário.")
+        # --- FUNÇÃO DE APAGAR REGISTRO ---
+        with st.expander("🗑️ Apagar Registro do Histórico"):
+            opcoes = {f"{row['Data']} - R$ {row['Bruto']:.2f}": idx for idx, row in st.session_state.historico.iterrows()}
+            if opcoes:
+                selecionado = st.selectbox("Selecione para apagar:", options=list(opcoes.keys()))
+                if st.button("CONFIRMAR EXCLUSÃO", use_container_width=True):
+                    idx_remover = opcoes[selecionado]
+                    st.session_state.historico = st.session_state.historico.drop(idx_remover).reset_index(drop=True)
+                    st.session_state.historico.to_csv(FILE_HIST, index=False)
+                    st.success("Removido!")
+                    time.sleep(1)
+                    st.rerun()
+    else: st.info("Sem dados.")
 
 with tab_contas:
-    st.subheader(f"🏠 Contas de {st.session_state.usuario.capitalize()}")
+    st.subheader("🏠 Contas da Casa")
     c1, c2 = st.columns(2)
     campos = ["Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"]
     for i, campo in enumerate(campos):
         col = c1 if i < 4 else c2
         st.session_state.contas[campo] = col.number_input(campo, value=float(st.session_state.contas.get(campo, 0)))
-    
-    col_save, col_logout = st.columns(2)
-    if col_save.button("💾 SALVAR CONTAS", use_container_width=True):
-        df_sem_user = df_todas_contas[df_todas_contas['Usuario'] != st.session_state.usuario]
-        df_novo_contas = pd.concat([df_sem_user, pd.DataFrame([st.session_state.contas])], ignore_index=True)
-        df_novo_contas.to_csv(FILE_CONTAS, index=False)
-        st.success("Salvo!")
+    if st.button("💾 SALVAR CONTAS", use_container_width=True):
+        pd.DataFrame([st.session_state.contas]).to_csv(FILE_CONTAS, index=False)
+        st.success("Contas salvas!")
         st.rerun()
-    
-    if col_logout.button("🚪 SAIR / TROCAR USUÁRIO", use_container_width=True):
-        st.session_state.usuario = None
-        st.rerun()
-
-
+    st.divider()
+    st.metric("TOTAL MENSAL", f"R$ {total_casa:.2f}")
