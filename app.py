@@ -165,26 +165,17 @@ with tab_hist:
         df_h = st.session_state.historico.copy()
         df_h['Data_dt'] = pd.to_datetime(df_h['Data'], format='%d/%m/%Y')
         hoje_agora = datetime.now()
+        
         periodo = st.radio("Período:", ["Semana", "Mês", "Ano"], horizontal=True)
         if periodo == "Semana": mask = df_h['Data_dt'] > (hoje_agora - timedelta(days=7))
         elif periodo == "Mês": mask = df_h['Data_dt'].dt.month == hoje_agora.month
         else: mask = df_h['Data_dt'].dt.year == hoje_agora.year
+        
         df_p = df_h[mask]
-        if not df_p.empty: renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
+        if not df_p.empty: 
+            renderizar_grade(df_p["Bruto"].sum(), df_p["Líquido"].sum(), df_p["KM"].sum(), df_p["Horas"].sum(), total_casa, dias_restantes, periodo)
+        
         st.divider()
-        st.dataframe(df_h.sort_values(by='Data_dt', ascending=False).drop(columns=['Data_dt']), use_container_width=True)
-    else: st.info("Sem dados.")
-
-with tab_contas:
-    st.subheader("🏠 Contas da Casa")
-    c1, c2 = st.columns(2)
-    campos = ["Aluguel", "Luz", "Água", "Internet", "Cartões", "Financiamentos", "Outras"]
-    for i, campo in enumerate(campos):
-        col = c1 if i < 4 else c2
-        st.session_state.contas[campo] = col.number_input(campo, value=float(st.session_state.contas.get(campo, 0)))
-    if st.button("💾 SALVAR CONTAS", use_container_width=True):
-        pd.DataFrame([st.session_state.contas]).to_csv(FILE_CONTAS, index=False)
-        st.success("Contas salvas!")
-        st.rerun()
-    st.divider()
-    st.metric("TOTAL MENSAL", f"R$ {total_casa:.2f}")
+        st.subheader("Lista de Registros")
+        
+        # Exibição da tabela com índices para facilitar a exclus
