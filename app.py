@@ -32,12 +32,13 @@ if menu == "Login":
     st.title("🔐 Login")
 
     email = st.text_input("Email", key="login_email").strip()
-senha = st.text_input("Senha", type="password", key="login_senha").strip()
+    senha = st.text_input("Senha", type="password", key="login_senha").strip()
+
     if st.button("Entrar"):
 
         user = usuarios[
-            (usuarios["email"] == email) &
-            (usuarios["senha"] == senha)
+            (usuarios["email"].astype(str) == email) &
+            (usuarios["senha"].astype(str) == senha)
         ]
 
         if len(user) > 0:
