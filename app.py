@@ -31,9 +31,8 @@ if menu == "Login":
 
     st.title("🔐 Login")
 
-    email = st.text_input("Email")
-    senha = st.text_input("Senha", type="password")
-
+    email = st.text_input("Email", key="login_email").strip()
+senha = st.text_input("Senha", type="password", key="login_senha").strip()
     if st.button("Entrar"):
 
         user = usuarios[
@@ -50,8 +49,8 @@ if menu == "Login":
             st.error("Email ou senha inválidos")
 
 # CADASTRO
-novo_email = st.text_input("Email")
-nova_senha = st.text_input("Senha", type="password")
+novo_email = st.text_input("Email", key="cadastro_email")
+nova_senha = st.text_input("Senha", type="password", key="cadastro_senha")
 
 if st.button("Cadastrar"):
 
