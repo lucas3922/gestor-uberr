@@ -74,7 +74,8 @@ if menu == "Cadastro":
 
 # BLOQUEIA APP
 if not st.session_state.logado:
-    st.stop()import streamlit as st
+    st.stop()
+    import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
 import calendar
