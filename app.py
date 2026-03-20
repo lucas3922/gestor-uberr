@@ -1,5 +1,81 @@
 import streamlit as st
 import pandas as pd
+import datetime
+import os
+
+st.set_page_config(page_title="Driver Finance PRO", layout="wide")
+
+# ------------------------
+# USUÁRIOS
+# ------------------------
+
+arquivo_usuarios = "usuarios.csv"
+
+if os.path.exists(arquivo_usuarios):
+    usuarios = pd.read_csv(arquivo_usuarios)
+else:
+    usuarios = pd.DataFrame(columns=["email","senha"])
+
+# estado
+if "logado" not in st.session_state:
+    st.session_state.logado = False
+
+# ------------------------
+# MENU LOGIN
+# ------------------------
+
+menu = st.sidebar.selectbox("Conta", ["Login", "Cadastro"])
+
+# LOGIN
+if menu == "Login":
+
+    st.title("🔐 Login")
+
+    email = st.text_input("Email")
+    senha = st.text_input("Senha", type="password")
+
+    if st.button("Entrar"):
+
+        user = usuarios[
+            (usuarios["email"] == email) &
+            (usuarios["senha"] == senha)
+        ]
+
+        if len(user) > 0:
+            st.session_state.logado = True
+            st.session_state.usuario = email
+            st.success("Login realizado!")
+            st.rerun()
+        else:
+            st.error("Email ou senha inválidos")
+
+# CADASTRO
+if menu == "Cadastro":
+
+    st.title("📝 Criar conta")
+
+    novo_email = st.text_input("Email")
+    nova_senha = st.text_input("Senha", type="password")
+
+    if st.button("Cadastrar"):
+
+        if novo_email in usuarios["email"].values:
+            st.warning("Email já cadastrado!")
+        else:
+            novo = pd.DataFrame({
+                "email":[novo_email],
+                "senha":[nova_senha]
+            })
+
+            usuarios = pd.concat([usuarios,novo],ignore_index=True)
+            usuarios.to_csv(arquivo_usuarios,index=False)
+
+            st.success("Conta criada!")
+
+# BLOQUEIA APP
+if not st.session_state.logado:
+    st.stop()import streamlit as st
+import pandas as pd
 from datetime import datetime, date, timedelta
 import calendar
 import os
