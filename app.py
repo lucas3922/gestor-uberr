@@ -50,27 +50,29 @@ if menu == "Login":
             st.error("Email ou senha inválidos")
 
 # CADASTRO
-if menu == "Cadastro":
+novo_email = st.text_input("Email")
+nova_senha = st.text_input("Senha", type="password")
 
-    st.title("📝 Criar conta")
+if st.button("Cadastrar"):
 
-    novo_email = st.text_input("Email")
-    nova_senha = st.text_input("Senha", type="password")
+    novo_email = novo_email.strip()
+    nova_senha = nova_senha.strip()
 
-    if st.button("Cadastrar"):
+    if novo_email in usuarios["email"].astype(str).values:
+        st.warning("Email já cadastrado!")
+    else:
+        novo = pd.DataFrame({
+            "email": [novo_email],
+            "senha": [nova_senha]
+        })
 
-        if novo_email in usuarios["email"].values:
-            st.warning("Email já cadastrado!")
-        else:
-            novo = pd.DataFrame({
-                "email":[novo_email],
-                "senha":[nova_senha]
-            })
+        usuarios = pd.concat([usuarios, novo], ignore_index=True)
 
-            usuarios = pd.concat([usuarios,novo],ignore_index=True)
-            usuarios.to_csv(arquivo_usuarios,index=False)
+        usuarios.to_csv(arquivo_usuarios, index=False)
 
-            st.success("Conta criada!")
+        st.success("Conta criada!")
+
+        st.rerun()
 
 # BLOQUEIA APP
 if not st.session_state.logado:
